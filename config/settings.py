@@ -4,9 +4,9 @@ Every secret or environment-specific value is read from environment variables,
 so nothing sensitive is committed to GitHub. See .env.example for the full list.
 """
 
-import os 
+import os
 from datetime import timedelta
-from pathlib import Path   
+from pathlib import Path
 
 import dj_database_url
 
@@ -44,7 +44,7 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = "config.urls"
 
-#configures for HTML rendering
+# configures for HTML rendering
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
@@ -74,7 +74,7 @@ DATABASES = {
 
 AUTH_USER_MODEL = "accounts.User"
 
-#reject passwords that are too short or entirely numeric
+# reject passwords that are too short or entirely numeric
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
@@ -99,7 +99,7 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
 }
 
-# Access tokens are short lived. Refresh is long lived. 
+# Access tokens are short lived. Refresh is long lived.
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(hours=1),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=1),

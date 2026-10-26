@@ -2,6 +2,8 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 
 from .models import User
+
+
 # Register your models here.
 # if the react side is not ready. It needs this small adapter becasue the user model has no username field.
 @admin.register(User)

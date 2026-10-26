@@ -1,6 +1,7 @@
 from rest_framework.permissions import BasePermission
 
-#For NFR decision: rike checks happen on the server for every request, never only by hiding buttons.
+
+# For NFR decision: rike checks happen on the server for every request, never only by hiding buttons.
 class IsCoordinator(BasePermission):
     """Coordinator-only endpoints. Signed-in donors get 403 (NFR-5)."""
 

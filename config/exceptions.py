@@ -1,7 +1,8 @@
 from rest_framework import status
 from rest_framework.exceptions import APIException
 
-#Sprint 2 error table maps duplicates and conflicts to 409
+
+# Sprint 2 error table maps duplicates and conflicts to 409
 class Conflict(APIException):
     """409: duplicate or conflicting operation (Sprint 2 error table)."""
 

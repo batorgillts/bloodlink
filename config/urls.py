@@ -14,12 +14,14 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+
 from django.contrib import admin
 from django.http import JsonResponse
 from django.urls import include, path
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
-#sign-in returns a JWT (US-02, US-06), and /api/health/ gives the deployment a quick "is it up" check
+
+# sign-in returns a JWT (US-02, US-06), and /api/health/ gives the deployment a quick "is it up" check
 def health(_request):
     return JsonResponse({"status": "ok"})
 
