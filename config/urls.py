@@ -20,6 +20,8 @@ from django.http import JsonResponse
 from django.urls import include, path
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
+from accounts.views import DonorRegistrationView
+
 
 # Sign-in returns a JWT (US-02, US-06); /api/health/ is a quick uptime check.
 def health(_request):
@@ -31,6 +33,7 @@ urlpatterns = [
     path("api/health/", health),
     path("api-auth/", include("rest_framework.urls")),  # login for the browsable API
     # Authentication & Access
+    path("api/auth/register/", DonorRegistrationView.as_view(), name="register"),
     path("api/auth/token/", TokenObtainPairView.as_view(), name="token"),
     path("api/auth/token/refresh/", TokenRefreshView.as_view(), name="token-refresh"),
 ]
