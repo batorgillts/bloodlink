@@ -1,0 +1,55 @@
+name: CI
+
+#Runs on every pull request into develop or main, and on every push to them
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+
+    #Same database as production, so row lock and contraints behave the same.
+        services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: bloodlink
+          POSTGRES_PASSWORD: bloodlink
+          POSTGRES_DB: bloodlink
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgres://bloodlink:bloodlink@localhost:5432/bloodlink
+      SECRET_KEY: ci-only-secret
+      DEBUG: "False"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Check migrations are committed
+        run: python manage.py makemigrations --check --dry-run
+
+      - name: Run tests with coverage
+        run: |
+          coverage run manage.py test
+          coverage report
