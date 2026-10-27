@@ -16,7 +16,7 @@ Requires Python 3.12 or newer.
 | Bat-Orgil Tsend-Ochir | Backend: auth, inventory, matching, CI | @batorgillts |
 | Chenshuo Li | | |
 | Miaomiao Li | | |
-| Parvathi Krishnan |US-01 |@parvathikrishnan11 |
+| Parvathi Krishnan |US-01(Backend: donor registration and donor records) |@parvathikrishnan11 |
 | Shuaiyu Chen | | |
 
 **Course:** CS-GY 6063 Software Engineering I, NYU Tandon, Fall 2026
@@ -69,6 +69,7 @@ into `develop` or `main`.
 | Method | Endpoint | Purpose | Who |
 |---|---|---|---|
 | GET | `/api/health/` | Check the server is up | Anyone |
+| POST | `/api/auth/register/` (`full_name`, `email`, `password`, `date_of_birth`, `blood_type`, `phone`) | Register as a donor and sign in; returns `access` and `refresh` tokens (US-01). 400 for invalid input, 409 if the email is taken | Anyone |
 | POST | `/api/auth/token/` (`email`, `password`) | Sign in, returns `access` and `refresh` tokens | Anyone |
 | POST | `/api/auth/token/refresh/` (`refresh`) | Get a new access token | Anyone |
 
@@ -79,8 +80,9 @@ Without it they return 401. A signed-in donor calling a coordinator-only endpoin
 
 | Folder | Component (Sprint 2 C4 diagram) |
 |---|---|
-| `accounts/` | Authentication & Access: custom User with role, permissions |
-| `config/` | Settings, URLs, shared exceptions |
+| `accounts/` | Authentication & Access: custom User with role, permissions, donor registration |
+| `donors/` | Donor & Donation Management: Donor profile (date of birth, blood type, phone, status) |
+| `config/` | Settings, URLs, shared exceptions, shared choices (blood types) |
 
 ## Team workflow
 
