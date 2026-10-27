@@ -21,7 +21,7 @@ from django.urls import include, path
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 
-# sign-in returns a JWT (US-02, US-06), and /api/health/ gives the deployment a quick "is it up" check
+# Sign-in returns a JWT (US-02, US-06); /api/health/ is a quick uptime check.
 def health(_request):
     return JsonResponse({"status": "ok"})
 

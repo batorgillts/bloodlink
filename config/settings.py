@@ -90,7 +90,9 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # JWT is listed first so unauthenticated API calls return 401, not 403 (NFR-1).
-# JWT reads the authorization: bearer header, while SessionAuthentication reads the session cookie. Order matters for NFR1. Every endpoint is locked by IsAuthenticated.
+# JWT reads the authorization: bearer header, while SessionAuthentication reads the session cookie.
+# Order matters for NFR1. Every endpoint is locked by IsAuthenticated.
+
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework_simplejwt.authentication.JWTAuthentication",

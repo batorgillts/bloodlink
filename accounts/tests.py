@@ -5,7 +5,8 @@ from rest_framework.test import APIClient
 from .models import User
 
 
-# These cover a good sign-in, a wrong password and a deactivated account (all 401), plus the case-insensitive email rule. Rubric: criterion 4
+# Covers valid sign-in, wrong password and deactivated account (all 401),
+# plus the case-insensitive unique email rule.
 class SignInTests(TestCase):
     """Token sign-in for both roles (US-02, US-06) and NFR-1."""
 
