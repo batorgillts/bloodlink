@@ -16,7 +16,7 @@ Requires Python 3.12 or newer.
 | Bat-Orgil Tsend-Ochir | Backend: auth, inventory, matching, CI | @batorgillts |
 | Chenshuo Li | | |
 | Miaomiao Li | | |
-| Parvathi Krishnan | | |
+| Parvathi Krishnan |US-01 |@parvathikrishnan11 |
 | Shuaiyu Chen | | |
 
 **Course:** CS-GY 6063 Software Engineering I, NYU Tandon, Fall 2026
