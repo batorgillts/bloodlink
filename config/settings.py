@@ -30,6 +30,7 @@ INSTALLED_APPS = [
     "corsheaders",
     # BloodLink components (Sprint 2 C4 diagram)
     "accounts",  # Authentication & Access
+    "donors",  # Donor & Donation Management
     # "inventory" is added in PR 2, "allocation" in PR 3
 ]
 
@@ -76,10 +77,14 @@ DATABASES = {
 
 AUTH_USER_MODEL = "accounts.User"
 
-# reject passwords that are too short or entirely numeric
+# US-01: at least 8 characters and at least one number; also reject all-numeric passwords
 AUTH_PASSWORD_VALIDATORS = [
-    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
+    {
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
+        "OPTIONS": {"min_length": 8},
+    },
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
+    {"NAME": "accounts.validators.ContainsNumberValidator"},
 ]
 
 LANGUAGE_CODE = "en-us"
