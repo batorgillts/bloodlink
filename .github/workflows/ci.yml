@@ -1,7 +1,5 @@
 name: CI
 
-#Runs on every pull request into develop or main, and on every push to them
-
 on:
   pull_request:
     branches: [develop, main]
@@ -12,8 +10,7 @@ jobs:
   lint-and-test:
     runs-on: ubuntu-latest
 
-    #Same database as production, so row lock and contraints behave the same.
-        services:
+    services:
       postgres:
         image: postgres:16
         env:
@@ -29,7 +26,7 @@ jobs:
 
     env:
       DATABASE_URL: postgres://bloodlink:bloodlink@localhost:5432/bloodlink
-      SECRET_KEY: ci-only-secret
+      SECRET_KEY: ci-only-secret-key-at-least-32-characters-long
       DEBUG: "False"
 
     steps:
