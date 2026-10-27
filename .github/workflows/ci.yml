@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: bloodlink
+          POSTGRES_PASSWORD: bloodlink
+          POSTGRES_DB: bloodlink
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgres://bloodlink:bloodlink@localhost:5432/bloodlink
+      SECRET_KEY: ci-only-secret-key-at-least-32-characters-long
+      DEBUG: "False"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Check migrations are committed
+        run: python manage.py makemigrations --check --dry-run
+
+      - name: Run tests with coverage
+        run: |
+          coverage run manage.py test
+          coverage report

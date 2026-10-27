@@ -1,0 +1,12 @@
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["*/migrations/*"]
+
+[tool.ruff.lint]
+# E/W: style, F: real bugs (unused imports, undefined names), I: import order
+select = ["E", "W", "F", "I"]
+
+[tool.coverage.run]
+source = ["accounts", "inventory", "allocation"]
+omit = ["*/migrations/*", "*/tests.py"]
