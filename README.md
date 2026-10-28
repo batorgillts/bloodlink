@@ -7,14 +7,14 @@ Backend: Django + Django REST Framework, PostgreSQL in production. Layered desig
 
 ## Run it locally
 
-Requires Python 3.12 or newer.
+Use Python 3.12, matching CI. The current Django 5.1 dependency does not support Python 3.14.
 
 ## Team
 
 | Name | Role | GitHub |
 |---|---|---|
 | Bat-Orgil Tsend-Ochir | Backend: auth, inventory, matching, CI | @batorgillts |
-| Chenshuo Li | | |
+| Chenshuo Li | US-03: donor contact information (backend) | @KoharuLee |
 | Miaomiao Li | | |
 | Parvathi Krishnan |US-01(Backend: donor registration and donor records) |@parvathikrishnan11 |
 | Shuaiyu Chen | | |
@@ -72,16 +72,24 @@ into `develop` or `main`.
 | POST | `/api/auth/register/` (`full_name`, `email`, `password`, `date_of_birth`, `blood_type`, `phone`) | Register as a donor and sign in; returns `access` and `refresh` tokens (US-01). 400 for invalid input, 409 if the email is taken | Anyone |
 | POST | `/api/auth/token/` (`email`, `password`) | Sign in, returns `access` and `refresh` tokens | Anyone |
 | POST | `/api/auth/token/refresh/` (`refresh`) | Get a new access token | Anyone |
+| GET / PATCH | `/api/donors/me/contact/` (`email` and/or `phone` for PATCH) | View or update own contact information (US-03) | Signed-in active donor |
+| GET / PATCH | `/api/donors/<donor_id>/contact/` | Same operation by donor profile ID; any other ID returns 403 | Owning active donor only |
 
 Protected endpoints require `Authorization: Bearer <access token>`.
 Without it they return 401. A signed-in donor calling a coordinator-only endpoint gets 403.
+
+US-03 returns 400 for invalid contact input, 403 for non-owner/coordinator access,
+404 when the signed-in donor has no profile, and 409 for an email already in use.
+The email is the account's sign-in email; changing it changes the email used for future sign-ins.
+Only email and phone can be updated. See [US-03 implementation and demo](docs/US-03.md)
+for the API contract, acceptance tests, dependency on US-01, and frontend handoff.
 
 ## Project layout
 
 | Folder | Component (Sprint 2 C4 diagram) |
 |---|---|
 | `accounts/` | Authentication & Access: custom User with role, permissions, donor registration |
-| `donors/` | Donor & Donation Management: Donor profile (date of birth, blood type, phone, status) |
+| `donors/` | Donor & Donation Management: profile and own-contact API; services and repository for US-03 |
 | `config/` | Settings, URLs, shared exceptions, shared choices (blood types) |
 
 ## Team workflow
