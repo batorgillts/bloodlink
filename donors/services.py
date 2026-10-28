@@ -1,12 +1,13 @@
 """Contact update rules for Donor & Donation Management (US-03)."""
 
 from django.db import IntegrityError
+from django.utils import timezone
 from rest_framework.exceptions import NotFound, PermissionDenied
 
 from accounts.models import User
 from config.exceptions import Conflict
 
-from . import repository
+from . import calculator, repository
 from .models import Donor
 
 
@@ -51,3 +52,83 @@ def update_contact(donor, changes):
         if email is not None and repository.email_in_use(email, user_id):
             raise duplicate_email() from None
         raise
+
+
+NO_HISTORY_MESSAGE = "No previous donations are recorded."
+OWN_RECORDS_ONLY = "You can only view your own donation history and eligibility."
+
+
+def bank_today():
+    # Settings use America/New_York. "Today" follows the blood bank, not UTC.
+    return timezone.localdate()
+
+
+def get_eligibility(user, donor_id=None):
+    today = bank_today()
+    if user.role == User.Role.COORDINATOR:
+        return _coordinator_eligibility(donor_id, today)
+    if user.role != User.Role.DONOR:
+        raise PermissionDenied("You cannot view donation eligibility.")
+    return _donor_eligibility(user.pk, donor_id, today)
+
+
+def _coordinator_eligibility(donor_id, today):
+    # Coordinators have no donor profile. /me/ belongs to the signed-in donor.
+    if donor_id is None:
+        raise PermissionDenied("Coordinators must look up a donor by id.")
+    donor = repository.find_donor(donor_id)
+    if donor is None:
+        raise NotFound("Donor profile not found.")
+    return _eligibility_payload(donor, today)
+
+
+def _donor_eligibility(user_id, donor_id, today):
+    donor = repository.find_contact(user_id)
+    if donor is None:
+        raise NotFound("Donor profile not found.")
+    # Deny a non-owned id whether or not that id exists, and do not look it up.
+    if donor_id is not None and donor_id != donor.pk:
+        raise PermissionDenied(OWN_RECORDS_ONLY)
+    ensure_active_donor(donor)
+    return _eligibility_payload(donor, today)
+
+
+def _eligibility_payload(donor, today):
+    donations = repository.donations_for(donor.pk)
+    rules = repository.interval_rules()
+    calculated = calculator.calculate_eligibility(
+        rules=[(rule.donation_type, rule.min_interval_days) for rule in rules],
+        donations=[(donation.donation_type_id, donation.donation_date) for donation in donations],
+        today=today,
+    )
+    recorded = bool(donations)
+    return {
+        "donor_id": donor.pk,
+        "as_of": today.isoformat(),
+        "no_donation_history": not recorded,
+        "message": None if recorded else NO_HISTORY_MESSAGE,
+        "donations": [_donation_row(donation) for donation in donations],
+        "eligibility": [_eligibility_row(row) for row in calculated],
+    }
+
+
+def _donation_row(donation):
+    return {
+        "donation_id": donation.pk,
+        "donation_type": donation.donation_type_id,
+        "donation_date": donation.donation_date.isoformat(),
+        "blood_type": donation.blood_type,
+        "volume_ml": donation.volume_ml,
+    }
+
+
+def _eligibility_row(row):
+    last = row["last_donation_date"]
+    return {
+        "donation_type": row["donation_type"],
+        "label": row["donation_type"].replace("_", " ").title(),
+        "min_interval_days": row["min_interval_days"],
+        "last_donation_date": None if last is None else last.isoformat(),
+        "next_eligible_date": row["next_eligible_date"].isoformat(),
+        "eligible": row["eligible"],
+    }

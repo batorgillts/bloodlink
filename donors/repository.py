@@ -6,7 +6,7 @@ from django.db import transaction
 
 from accounts.models import User
 
-from .models import Donor
+from .models import Donation, DonationIntervalRule, Donor
 
 
 def find_contact(user_id):
@@ -35,3 +35,15 @@ def save_contact(donor, changes):
     if "phone" in changes:
         donor.phone = changes["phone"]
         donor.save(update_fields=["phone"])
+
+
+def find_donor(donor_id):
+    return Donor.objects.select_related("user").filter(pk=donor_id).first()
+
+
+def interval_rules():
+    return list(DonationIntervalRule.objects.order_by("id"))
+
+
+def donations_for(donor_id):
+    return list(Donation.objects.filter(donor_id=donor_id).order_by("-donation_date", "-id"))

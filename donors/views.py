@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from . import services
-from .permissions import IsDonor
+from .permissions import CanViewEligibility, IsDonor
 from .serializers import ContactSerializer, ContactUpdateSerializer
 
 
@@ -22,3 +22,12 @@ class DonorContactView(APIView):
         data.is_valid(raise_exception=True)
         donor = services.update_contact(donor, data.validated_data)
         return Response(ContactSerializer(donor).data)
+
+
+class EligibilityView(APIView):
+    """US-04: donation history and the next eligible date for each donation type."""
+
+    permission_classes = [IsAuthenticated, CanViewEligibility]
+
+    def get(self, request, donor_id=None):
+        return Response(services.get_eligibility(request.user, donor_id))
