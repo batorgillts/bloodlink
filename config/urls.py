@@ -32,6 +32,7 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/health/", health),
     path("api-auth/", include("rest_framework.urls")),  # login for the browsable API
+    path("api/donors/", include("donors.urls")),
     # Authentication & Access
     path("api/auth/register/", DonorRegistrationView.as_view(), name="register"),
     path("api/auth/token/", TokenObtainPairView.as_view(), name="token"),
