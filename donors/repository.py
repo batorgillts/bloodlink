@@ -37,8 +37,32 @@ def save_contact(donor, changes):
         donor.save(update_fields=["phone"])
 
 
+def save_donor_record(donor, changes):
+    donor_fields = []
+    if "email" in changes:
+        donor.user.email = changes["email"]
+        donor.user.save(update_fields=["email"])
+    for field in ("full_name", "date_of_birth", "blood_type", "phone"):
+        if field in changes:
+            setattr(donor, field, changes[field])
+            donor_fields.append(field)
+    if donor_fields:
+        donor.save(update_fields=donor_fields)
+
+
 def find_donor(donor_id):
     return Donor.objects.select_related("user").filter(pk=donor_id).first()
+
+
+def search_donors(*, name=None, email=None, blood_type=None):
+    queryset = Donor.objects.select_related("user").filter(user__role=User.Role.DONOR)
+    if name:
+        queryset = queryset.filter(full_name__icontains=name)
+    if email:
+        queryset = queryset.filter(user__email__icontains=email)
+    if blood_type:
+        queryset = queryset.filter(blood_type=blood_type)
+    return queryset.order_by("full_name", "id")
 
 
 def interval_rules():
