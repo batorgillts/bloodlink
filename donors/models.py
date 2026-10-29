@@ -38,3 +38,66 @@ class Donor(models.Model):
 
     def __str__(self):
         return f"{self.full_name} ({self.blood_type})"
+
+
+class DonationIntervalRule(models.Model):
+    """Minimum days between donations of one type (US-04, configured, not hardcoded)."""
+
+    donation_type = models.CharField(max_length=32, unique=True)
+    min_interval_days = models.PositiveIntegerField()
+
+    class Meta:
+        ordering = ["id"]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(min_interval_days__gte=1),
+                name="donation_interval_days_positive",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.donation_type} ({self.min_interval_days} days)"
+
+
+class Donation(models.Model):
+    """One donation entry (ER: DONATION). The next eligible date is calculated, not stored."""
+
+    donor = models.ForeignKey(Donor, on_delete=models.PROTECT, related_name="donations")
+    # The column stores the rule's donation_type code (ER: FK donation_type).
+    donation_type = models.ForeignKey(
+        DonationIntervalRule,
+        to_field="donation_type",
+        db_column="donation_type",
+        on_delete=models.PROTECT,
+        related_name="donations",
+    )
+    donation_date = models.DateField()
+    blood_type = models.CharField(max_length=3, choices=BloodType.choices)
+    volume_ml = models.PositiveIntegerField()
+    recorded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="recorded_donations",
+    )
+
+    class Meta:
+        ordering = ["-donation_date", "-id"]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(blood_type__in=BloodType.values),
+                name="donation_blood_type_valid",
+            ),
+            models.CheckConstraint(
+                condition=Q(volume_ml__gte=1),
+                name="donation_volume_positive",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=["donor", "donation_type", "donation_date"],
+                name="donation_donor_type_date",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.donor_id} {self.donation_type_id} {self.donation_date}"

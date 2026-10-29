@@ -10,3 +10,16 @@ class IsDonor(BasePermission):
 
     def has_permission(self, request, view):
         return request.user.is_authenticated and request.user.role == User.Role.DONOR
+
+
+class CanViewEligibility(BasePermission):
+    """US-04: a donor sees their own eligibility; a coordinator looks up one donor."""
+
+    message = "You cannot view donation eligibility."
+
+    def has_permission(self, request, view):
+        user = request.user
+        return user.is_authenticated and user.role in (
+            User.Role.DONOR,
+            User.Role.COORDINATOR,
+        )
