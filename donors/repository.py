@@ -55,7 +55,10 @@ def find_donor(donor_id):
 
 
 def search_donors(*, name=None, email=None, blood_type=None):
-    queryset = Donor.objects.select_related("user").filter(user__role=User.Role.DONOR)
+    queryset = Donor.objects.select_related("user").filter(
+        user__role=User.Role.DONOR,
+        status=Donor.Status.ACTIVE,
+    )
     if name:
         queryset = queryset.filter(full_name__icontains=name)
     if email:

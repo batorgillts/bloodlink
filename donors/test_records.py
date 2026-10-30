@@ -70,6 +70,30 @@ class DonorRecordApiTests(TestCase):
         response = self.client.get(LIST_URL, {"name": "ana", "blood_type": "O-"})
         self.assertEqual([row["id"] for row in response.data], [self.donor.pk])
 
+    def test_search_returns_only_active_donors(self):
+        inactive_records = (
+            ("withdrawn@example.com", Donor.Status.WITHDRAWN),
+            ("deleted@example.com", Donor.Status.DELETED),
+        )
+        for email, donor_status in inactive_records:
+            user = User.objects.create_user(email, PASSWORD)
+            Donor.objects.create(
+                user=user,
+                full_name=email.split("@")[0],
+                date_of_birth=date(1990, 1, 1),
+                blood_type="A+",
+                phone="2125550999",
+                status=donor_status,
+            )
+
+        response = self.client.get(LIST_URL)
+
+        result_ids = {row["id"] for row in response.data}
+        self.assertEqual(result_ids, {self.donor.pk, self.other_donor.pk})
+        self.assertTrue(
+            all(row["status"] == Donor.Status.ACTIVE for row in response.data)
+        )
+
     def test_detail_includes_profile_donation_history_and_eligibility(self):
         rule = DonationIntervalRule.objects.get(donation_type="whole_blood")
         Donation.objects.create(
