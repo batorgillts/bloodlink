@@ -2,7 +2,7 @@
 
 from django.db import IntegrityError
 from django.utils import timezone
-from rest_framework.exceptions import NotFound, PermissionDenied
+from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 
 from accounts.models import User
 from accounts.services import create_donor_account
@@ -164,3 +164,63 @@ def _eligibility_row(row):
         "next_eligible_date": row["next_eligible_date"].isoformat(),
         "eligible": row["eligible"],
     }
+
+
+INACTIVE_DONOR = "Donations can only be recorded for an active donor."
+
+def record_donation(donor_id, data, coordinator):
+    """US-09 implementation"""
+
+    rule = data["donation_type"]
+    donation_date = data["donation_date"]
+
+    with repository.locked_donor(donor_id) as donor:
+        if donor is None:
+            raise NotFound("Donor record not found.")
+        if donor.status != Donor.Status.ACTIVE or not donor.user.is_active:
+            raise Conflict(INACTIVE_DONOR)
+        if data["blood_type"] != donor.blood_type:
+            raise ValidationError(
+                {"blood_type": [f"Does not match the donor's blood type ({donor.blood_type})."]}
+            )
+        _check_interval(donor.pk, rule, donation_date)
+
+        donation = repository.create_donation(
+            donor=donor,
+            donation_type=rule,
+            donation_date=donation_date,
+            blood_type=data["blood_type"],
+            volume_ml=data["volume_ml"],
+            recorded_by=coordinator,
+        )
+
+    return {"donation": _donation_row(donation), **_eligibility_payload(donor, bank_today())}
+
+
+def _check_interval(donor_id, rule, donation_date):
+    dates = repository.donation_dates(donor_id, rule.donation_type)
+    # Same formula as US-04
+    on_that_day = calculator.calculate_eligibility(
+        rules=[(rule.donation_type, rule.min_interval_days)],
+        donations=[(rule.donation_type, d) for d in dates if d <= donation_date],
+        today=donation_date,
+    )[0]
+    if not on_that_day["eligible"]:
+        raise ValidationError(
+            {
+                "donation_date": [
+                    f"The donor is not eligible for {rule.donation_type} until "
+                    f"{on_that_day['next_eligible_date'].isoformat()}."
+                ]
+            }
+        )
+    later = [d for d in dates if d > donation_date]
+    if later and (later[0] - donation_date).days < rule.min_interval_days:
+        raise ValidationError(
+            {
+                "donation_date": [
+                    f"This date is within {rule.min_interval_days} days of the "
+                    f"{rule.donation_type} donation already recorded on {later[0].isoformat()}."
+                ]
+            }
+        )
