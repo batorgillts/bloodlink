@@ -5,6 +5,7 @@ from django.utils import timezone
 from rest_framework.exceptions import NotFound, PermissionDenied
 
 from accounts.models import User
+from accounts.services import create_donor_account
 from config.exceptions import Conflict
 
 from . import calculator, repository
@@ -50,6 +51,37 @@ def update_contact(donor, changes):
         # The database is the final guard if another account claimed the email
         # after the initial check. Check outside the rolled-back transaction.
         if email is not None and repository.email_in_use(email, user_id):
+            raise duplicate_email() from None
+        raise
+
+
+def search_donor_records(filters):
+    return repository.search_donors(**filters)
+
+
+def get_donor_record(donor_id):
+    donor = repository.find_donor(donor_id)
+    if donor is None:
+        raise NotFound("Donor record not found.")
+    return donor
+
+
+def create_walk_in_donor(data):
+    """US-08: create the same User/Donor pair as self-registration, without tokens."""
+    _user, donor = create_donor_account(**data)
+    return donor
+
+
+def update_donor_record(donor, changes):
+    email = changes.get("email")
+    try:
+        with repository.locked_contact(donor.user_id) as current:
+            if email is not None and repository.email_in_use(email, current.user_id):
+                raise duplicate_email()
+            repository.save_donor_record(current, changes)
+            return current
+    except IntegrityError:
+        if email is not None and repository.email_in_use(email, donor.user_id):
             raise duplicate_email() from None
         raise
 

@@ -74,6 +74,9 @@ into `develop` or `main`.
 | POST | `/api/auth/token/refresh/` (`refresh`) | Get a new access token | Anyone |
 | GET / PATCH | `/api/donors/me/contact/` (`email` and/or `phone` for PATCH) | View or update own contact information (US-03) | Signed-in active donor |
 | GET / PATCH | `/api/donors/<donor_id>/contact/` | Same operation by donor profile ID; any other ID returns 403 | Owning active donor only |
+| GET | `/api/donors/?name=&email=&blood_type=` | Search donor records (US-08) | Coordinator |
+| GET / PATCH | `/api/donors/<donor_id>/` | View donor profile, donation history and eligibility; edit profile fields (US-08) | Coordinator |
+| POST | `/api/donors/` (`full_name`, `email`, `password`, `date_of_birth`, `blood_type`, `phone`) | Create a donor account and profile for a walk-in donor (US-08); returns the profile, not login tokens | Coordinator |
 
 Protected endpoints require `Authorization: Bearer <access token>`.
 Without it they return 401. A signed-in donor calling a coordinator-only endpoint gets 403.
@@ -83,6 +86,9 @@ US-03 returns 400 for invalid contact input, 403 for non-owner/coordinator acces
 The email is the account's sign-in email; changing it changes the email used for future sign-ins.
 Only email and phone can be updated. See [US-03 implementation and demo](docs/US-03.md)
 for the API contract, acceptance tests, dependency on US-01, and frontend handoff.
+
+US-08 donor search, walk-in registration, profile updates, and coordinator-only
+record access are covered by `donors/test_records.py`.
 
 ## Project layout
 
