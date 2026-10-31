@@ -2,9 +2,11 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from accounts.permissions import IsCoordinator
+
 from . import services
 from .permissions import CanViewEligibility, IsDonor
-from .serializers import ContactSerializer, ContactUpdateSerializer
+from .serializers import ContactSerializer, ContactUpdateSerializer, DeleteConfirmationSerializer
 
 
 class DonorContactView(APIView):
@@ -31,3 +33,21 @@ class EligibilityView(APIView):
 
     def get(self, request, donor_id=None):
         return Response(services.get_eligibility(request.user, donor_id))
+
+
+class DonationDeleteView(APIView):
+    permission_classes = [IsAuthenticated, IsCoordinator]
+
+    def delete(self, request, donor_id, donation_id):
+        confirmation = DeleteConfirmationSerializer(data=request.data)
+        confirmation.is_valid(raise_exception=True)
+        return Response(services.delete_donation(request.user, donor_id, donation_id))
+
+
+class DonorDeleteView(APIView):
+    permission_classes = [IsAuthenticated, IsCoordinator]
+
+    def delete(self, request, donor_id):
+        confirmation = DeleteConfirmationSerializer(data=request.data)
+        confirmation.is_valid(raise_exception=True)
+        return Response(services.delete_donor(request.user, donor_id))

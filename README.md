@@ -84,6 +84,17 @@ The email is the account's sign-in email; changing it changes the email used for
 Only email and phone can be updated. See [US-03 implementation and demo](docs/US-03.md)
 for the API contract, acceptance tests, dependency on US-01, and frontend handoff.
 
+## US-10: coordinator deletion
+
+- `DELETE /api/donors/<donor_id>/donations/<donation_id>/`: remove one donation and
+  return recalculated eligibility and history.
+- `DELETE /api/donors/<donor_id>/`: mark a donor deleted and disable sign-in,
+  retaining linked donation history.
+- Both require a coordinator token and JSON `{"confirm": true}`. See
+  [US-10 API, tests and demo](docs/US-10.md) for errors and integration requirements.
+- Search/matching must use active donor filters; these endpoints and React UI
+  still need integration before the full story is Done.
+
 ## Project layout
 
 | Folder | Component (Sprint 2 C4 diagram) |

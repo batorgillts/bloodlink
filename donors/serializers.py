@@ -1,6 +1,19 @@
 from rest_framework import serializers
 
 
+class DeleteConfirmationSerializer(serializers.Serializer):
+    """Destructive requests require an explicit JSON boolean, not a truthy string."""
+
+    confirm = serializers.BooleanField()
+
+    def to_internal_value(self, data):
+        if not isinstance(data, dict) or data.get("confirm") is not True:
+            raise serializers.ValidationError({"confirm": ["Send confirm as JSON true."]})
+        if set(data) != {"confirm"}:
+            raise serializers.ValidationError({"non_field_errors": ["Only confirm is accepted."]})
+        return super().to_internal_value(data)
+
+
 class ContactSerializer(serializers.Serializer):
     """Only contact fields are exposed, never credentials or other donors' data."""
 

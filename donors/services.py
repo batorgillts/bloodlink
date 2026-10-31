@@ -132,3 +132,42 @@ def _eligibility_row(row):
         "next_eligible_date": row["next_eligible_date"].isoformat(),
         "eligible": row["eligible"],
     }
+
+
+def ensure_coordinator(user):
+    if not user.is_active or user.role != User.Role.COORDINATOR:
+        raise PermissionDenied("Only active coordinators can delete records.")
+
+
+def delete_donation(user, donor_id, donation_id):
+    ensure_coordinator(user)
+    donor = repository.find_donor(donor_id)
+    if donor is None:
+        raise NotFound("Donor profile not found.")
+    # Same User -> Donor lock order as contact updates and donor deletion.
+    with repository.locked_contact(donor.user_id) as current:
+        donation = repository.locked_donation(current.pk, donation_id)
+        if donation is None:
+            raise NotFound("Donation entry not found for this donor.")
+        repository.remove_donation(donation)
+        # Calculate inside the transaction: failure rolls the deletion back.
+        return {
+            "message": "Donation entry deleted successfully.",
+            "deleted_donation_id": donation_id,
+            "donor": _eligibility_payload(current, bank_today()),
+        }
+
+
+def delete_donor(user, donor_id):
+    ensure_coordinator(user)
+    donor = repository.find_donor(donor_id)
+    if donor is None:
+        raise NotFound("Donor profile not found.")
+    with repository.locked_contact(donor.user_id) as current:
+        # Repeated confirmed requests are safe and return the same final state.
+        repository.deactivate_donor(current)
+        return {
+            "message": "Donor record deleted. Donation history retained.",
+            "donor_id": current.pk,
+            "status": current.status,
+        }

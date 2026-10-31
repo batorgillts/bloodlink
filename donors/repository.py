@@ -47,3 +47,27 @@ def interval_rules():
 
 def donations_for(donor_id):
     return list(Donation.objects.filter(donor_id=donor_id).order_by("-donation_date", "-id"))
+
+
+def active_donors():
+    """Search/matching must use active profiles; history lookups must not."""
+    return Donor.objects.filter(
+        status=Donor.Status.ACTIVE, user__is_active=True, user__role=User.Role.DONOR
+    )
+
+
+def locked_donation(donor_id, donation_id):
+    return Donation.objects.select_for_update().filter(
+        pk=donation_id, donor_id=donor_id
+    ).first()
+
+
+def remove_donation(donation):
+    donation.delete()
+
+
+def deactivate_donor(donor):
+    donor.status = Donor.Status.DELETED
+    donor.save(update_fields=["status"])
+    donor.user.is_active = False
+    donor.user.save(update_fields=["is_active"])
