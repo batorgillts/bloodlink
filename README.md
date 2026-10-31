@@ -17,7 +17,7 @@ Use Python 3.12, matching CI. The current Django 5.1 dependency does not support
 | Chenshuo Li | US-03: donor contact information (backend) | @KoharuLee |
 | Miaomiao Li | | |
 | Parvathi Krishnan |US-01(Backend: donor registration and donor records) |@parvathikrishnan11 |
-| Shuaiyu Chen | | |
+| Shuaiyu Chen | US-04: check donation eligibility (backend); US-05: withdraw donor registration (backend) | @CSY-Eason |
 
 **Course:** CS-GY 6063 Software Engineering I, NYU Tandon, Fall 2026
 **Instructor:** Raz Saremi
@@ -77,6 +77,8 @@ into `develop` or `main`.
 | GET | `/api/donors/?name=&email=&blood_type=` | Search donor records (US-08) | Coordinator |
 | GET / PATCH | `/api/donors/<donor_id>/` | View donor profile, donation history and eligibility; edit profile fields (US-08) | Coordinator |
 | POST | `/api/donors/` (`full_name`, `email`, `password`, `date_of_birth`, `blood_type`, `phone`) | Create a donor account and profile for a walk-in donor (US-08); returns the profile, not login tokens | Coordinator |
+| POST | `/api/donors/me/withdraw/` (`confirm: true`) | Withdraw own registration: set donor status to `withdrawn`, deactivate sign-in, and keep donation history (US-05). 400 if confirmation is missing | Signed-in active donor |
+| POST | `/api/donors/<donor_id>/withdraw/` (`confirm: true`) | Same withdrawal by donor profile ID; any other ID returns 403 | Owning active donor only |
 
 Protected endpoints require `Authorization: Bearer <access token>`.
 Without it they return 401. A signed-in donor calling a coordinator-only endpoint gets 403.
@@ -89,6 +91,16 @@ for the API contract, acceptance tests, dependency on US-01, and frontend handof
 
 US-08 donor search, walk-in registration, profile updates, and coordinator-only
 record access are covered by `donors/test_records.py`.
+
+US-05 withdraws the signed-in donor's own registration. The donor row stays, with
+status `withdrawn` and `User.is_active` set to false, so the same email and password
+can no longer sign in. Donation rows are not removed. Coordinator search already
+returns only `active` donors, so a withdrawn donor is left out of those results.
+A coordinator can still open that donor's record and donation history by id.
+See [US-05 implementation and demo](docs/US-05.md). Missing confirmation is 400.
+Another donor, a coordinator, or an already withdrawn or deleted profile is 403.
+A signed-in donor with no profile is 404. A withdrawn account's later requests,
+including sign-in and token refresh, are 401.
 
 ## Project layout
 

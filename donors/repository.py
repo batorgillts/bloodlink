@@ -74,3 +74,11 @@ def interval_rules():
 
 def donations_for(donor_id):
     return list(Donation.objects.filter(donor_id=donor_id).order_by("-donation_date", "-id"))
+
+
+def mark_withdrawn(donor):
+    """US-05: keep the donor row and its donations, and stop sign-in."""
+    donor.status = Donor.Status.WITHDRAWN
+    donor.save(update_fields=["status"])
+    donor.user.is_active = False
+    donor.user.save(update_fields=["is_active"])
