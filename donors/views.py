@@ -8,13 +8,14 @@ from accounts.permissions import IsCoordinator
 from accounts.serializers import DonorRegistrationSerializer
 
 from . import services
-from .permissions import CanViewEligibility, IsDonor
+from .permissions import CanViewEligibility, CanWithdrawRegistration, IsDonor
 from .serializers import (
     ContactSerializer,
     ContactUpdateSerializer,
     DonorRecordSerializer,
     DonorRecordUpdateSerializer,
     DonorSearchParamsSerializer,
+    WithdrawConfirmationSerializer,
 )
 
 
@@ -82,3 +83,22 @@ class DonorRecordDetailView(APIView):
         data.is_valid(raise_exception=True)
         donor = services.update_donor_record(donor, data.validated_data)
         return Response(DonorRecordSerializer(donor).data)
+
+
+class WithdrawRegistrationView(APIView):
+    """US-05: POST confirmation to deactivate the signed-in donor's own account."""
+
+    permission_classes = [IsAuthenticated, CanWithdrawRegistration]
+
+    def post(self, request, donor_id=None):
+        data = WithdrawConfirmationSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        donor = services.withdraw_registration(request.user.pk, donor_id)
+        return Response(
+            {
+                "donor_id": donor.pk,
+                "status": donor.status,
+                "account_active": donor.user.is_active,
+                "donation_history_retained": True,
+            }
+        )

@@ -164,3 +164,21 @@ def _eligibility_row(row):
         "next_eligible_date": row["next_eligible_date"].isoformat(),
         "eligible": row["eligible"],
     }
+
+
+OWN_WITHDRAWAL_ONLY = "You can only withdraw your own registration."
+
+
+def withdraw_registration(user_id, donor_id=None):
+    """US-05: active donor confirms withdrawal. History stays linked to the donor."""
+    donor = repository.find_contact(user_id)
+    if donor is None:
+        raise NotFound("Donor profile not found.")
+    # A non-owned id is denied whether or not that id exists.
+    if donor_id is not None and donor_id != donor.pk:
+        raise PermissionDenied(OWN_WITHDRAWAL_ONLY)
+    ensure_active_donor(donor)
+    with repository.locked_contact(user_id) as current:
+        ensure_active_donor(current)
+        repository.mark_withdrawn(current)
+        return current

@@ -23,3 +23,12 @@ class CanViewEligibility(BasePermission):
             User.Role.DONOR,
             User.Role.COORDINATOR,
         )
+
+
+class CanWithdrawRegistration(BasePermission):
+    """US-05: only a donor may withdraw their own registration."""
+
+    message = "Only a donor can withdraw their own registration."
+
+    def has_permission(self, request, view):
+        return request.user.is_authenticated and request.user.role == User.Role.DONOR
