@@ -77,6 +77,7 @@ into `develop` or `main`.
 | GET | `/api/donors/?name=&email=&blood_type=` | Search donor records (US-08) | Coordinator |
 | GET / PATCH | `/api/donors/<donor_id>/` | View donor profile, donation history and eligibility; edit profile fields (US-08) | Coordinator |
 | POST | `/api/donors/` (`full_name`, `email`, `password`, `date_of_birth`, `blood_type`, `phone`) | Create a donor account and profile for a walk-in donor (US-08); returns the profile, not login tokens | Coordinator |
+| POST | `/api/donors/<donor_id>/donations/` (`donation_type`, `donation_date`, `blood_type`, `volume_ml`) | Record a donation entry (US-09); returns the entry with recalculated history and eligibility. 400 if invalid or not yet eligible, 409 if the donor is not active | Coordinator |
 
 Protected endpoints require `Authorization: Bearer <access token>`.
 Without it they return 401. A signed-in donor calling a coordinator-only endpoint gets 403.
@@ -90,6 +91,7 @@ for the API contract, acceptance tests, dependency on US-01, and frontend handof
 US-08 donor search, walk-in registration, profile updates, and coordinator-only
 record access are covered by `donors/test_records.py`.
 
+US-09 donation recording is covered by `donors/test_donations.py`.
 ## Project layout
 
 | Folder | Component (Sprint 2 C4 diagram) |

@@ -20,7 +20,7 @@ def email_in_use(email, user_id):
 @contextmanager
 def locked_contact(user_id):
     # Both writes either succeed or roll back. Lock the account first, then its
-    # profile, to serialize concurrent edits to the same donor on PostgreSQL.
+    # profile,to avoid concurrent edits
     with transaction.atomic():
         user = User.objects.select_for_update().get(pk=user_id)
         donor = Donor.objects.select_for_update().get(user_id=user_id)
@@ -74,3 +74,24 @@ def interval_rules():
 
 def donations_for(donor_id):
     return list(Donation.objects.filter(donor_id=donor_id).order_by("-donation_date", "-id"))
+
+
+
+@contextmanager
+def locked_donor(donor_id):
+    """US-09: lock one donor row so two coordinators recording a donation for the same
+    donor at the same moment are checked one after the other (PostgreSQL row lock)."""
+    with transaction.atomic():
+        yield Donor.objects.select_for_update().select_related("user").filter(pk=donor_id).first()
+
+
+def donation_dates(donor_id, donation_type):
+    return list(
+        Donation.objects.filter(donor_id=donor_id, donation_type_id=donation_type)
+        .order_by("donation_date")
+        .values_list("donation_date", flat=True)
+    )
+
+
+def create_donation(**fields):
+    return Donation.objects.create(**fields)

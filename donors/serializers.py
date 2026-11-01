@@ -1,8 +1,9 @@
+from django.utils import timezone
 from rest_framework import serializers
 
 from config.choices import BloodType
 
-from .models import Donor
+from .models import DonationIntervalRule, Donor
 
 
 class ContactSerializer(serializers.Serializer):
@@ -105,3 +106,31 @@ class DonorRecordUpdateSerializer(serializers.Serializer):
         if not attrs:
             raise serializers.ValidationError("Provide at least one donor field to update.")
         return attrs
+
+
+class DonationCreateSerializer(serializers.Serializer):
+    """US-09"""
+
+    donation_type = serializers.SlugRelatedField(
+        slug_field="donation_type",
+        queryset=DonationIntervalRule.objects.all(),
+        error_messages={"does_not_exist": "Unknown donation type: {value}."},
+    )
+    donation_date = serializers.DateField()
+    blood_type = serializers.ChoiceField(choices=BloodType.choices)
+    volume_ml = serializers.IntegerField(min_value=1)
+
+    def to_internal_value(self, data):
+        if isinstance(data, dict):
+            unexpected = set(data) - set(self.fields)
+            if unexpected:
+                raise serializers.ValidationError(
+                    {key: ["This field cannot be set here."] for key in sorted(unexpected)}
+                )
+        return super().to_internal_value(data)
+
+    def validate_donation_date(self, value):
+        # The blood bank's local date , as in US-04.
+        if value > timezone.localdate():
+            raise serializers.ValidationError("Donation date cannot be in the future.")
+        return value
