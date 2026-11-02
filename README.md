@@ -79,6 +79,7 @@ into `develop` or `main`.
 | POST | `/api/donors/` (`full_name`, `email`, `password`, `date_of_birth`, `blood_type`, `phone`) | Create a donor account and profile for a walk-in donor (US-08); returns the profile, not login tokens | Coordinator |
 | POST | `/api/donors/me/withdraw/` (`confirm: true`) | Withdraw own registration: set donor status to `withdrawn`, deactivate sign-in, and keep donation history (US-05). 400 if confirmation is missing | Signed-in active donor |
 | POST | `/api/donors/<donor_id>/withdraw/` (`confirm: true`) | Same withdrawal by donor profile ID; any other ID returns 403 | Owning active donor only |
+| POST | `/api/donors/<donor_id>/donations/` (`donation_type`, `donation_date`, `blood_type`, `volume_ml`) | Record a donation entry (US-09); returns the entry with recalculated history and eligibility. 400 if invalid or not yet eligible, 409 if the donor is not active | Coordinator |
 
 Protected endpoints require `Authorization: Bearer <access token>`.
 Without it they return 401. A signed-in donor calling a coordinator-only endpoint gets 403.
@@ -102,6 +103,7 @@ Another donor, a coordinator, or an already withdrawn or deleted profile is 403.
 A signed-in donor with no profile is 404. A withdrawn account's later requests,
 including sign-in and token refresh, are 401.
 
+US-09 donation recording is covered by `donors/test_donations.py`.
 ## Project layout
 
 | Folder | Component (Sprint 2 C4 diagram) |

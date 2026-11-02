@@ -12,6 +12,7 @@ from .permissions import CanViewEligibility, CanWithdrawRegistration, IsDonor
 from .serializers import (
     ContactSerializer,
     ContactUpdateSerializer,
+    DonationCreateSerializer,
     DonorRecordSerializer,
     DonorRecordUpdateSerializer,
     DonorSearchParamsSerializer,
@@ -102,3 +103,21 @@ class WithdrawRegistrationView(APIView):
                 "donation_history_retained": True,
             }
         )
+
+
+class DonationCreateView(APIView):
+    """US-09 (as per sprint 2)
+    201: saved;
+    400: missing/invalid field, future date, not yet eligible, blood type mismatch
+    403: caller is not a coordinator
+    404: unknown donor
+    409: donor not active
+    """
+
+    permission_classes = [IsCoordinator]
+
+    def post(self, request, donor_id):
+        data = DonationCreateSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        result = services.record_donation(donor_id, data.validated_data, request.user)
+        return Response(result, status=status.HTTP_201_CREATED)
