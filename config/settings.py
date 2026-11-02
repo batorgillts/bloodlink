@@ -29,7 +29,7 @@ INSTALLED_APPS = [
     # BloodLink components (Sprint 2 C4 diagram)
     "accounts",  # Authentication & Access
     "donors",  # Donor & Donation Management
-    # "inventory" is added in PR 2, "allocation" in PR 3
+    "inventory" #inventory management
 ]
 
 MIDDLEWARE = [
