@@ -20,7 +20,7 @@ def email_in_use(email, user_id):
 @contextmanager
 def locked_contact(user_id):
     # Both writes either succeed or roll back. Lock the account first, then its
-    # profile, to serialize concurrent edits to the same donor on PostgreSQL.
+    # profile,to avoid concurrent edits
     with transaction.atomic():
         user = User.objects.select_for_update().get(pk=user_id)
         donor = Donor.objects.select_for_update().get(user_id=user_id)
@@ -37,8 +37,32 @@ def save_contact(donor, changes):
         donor.save(update_fields=["phone"])
 
 
+def save_donor_record(donor, changes):
+    donor_fields = []
+    if "email" in changes:
+        donor.user.email = changes["email"]
+        donor.user.save(update_fields=["email"])
+    for field in ("full_name", "date_of_birth", "blood_type", "phone"):
+        if field in changes:
+            setattr(donor, field, changes[field])
+            donor_fields.append(field)
+    if donor_fields:
+        donor.save(update_fields=donor_fields)
+
+
 def find_donor(donor_id):
     return Donor.objects.select_related("user").filter(pk=donor_id).first()
+
+
+def search_donors(*, name=None, email=None, blood_type=None):
+    queryset = active_donors().select_related("user")
+    if name:
+        queryset = queryset.filter(full_name__icontains=name)
+    if email:
+        queryset = queryset.filter(user__email__icontains=email)
+    if blood_type:
+        queryset = queryset.filter(blood_type=blood_type)
+    return queryset.order_by("full_name", "id")
 
 
 def interval_rules():
@@ -71,3 +95,34 @@ def deactivate_donor(donor):
     donor.save(update_fields=["status"])
     donor.user.is_active = False
     donor.user.save(update_fields=["is_active"])
+
+
+def mark_withdrawn(donor):
+    """US-05: keep the donor row and its donations, and stop sign-in."""
+    donor.status = Donor.Status.WITHDRAWN
+    donor.save(update_fields=["status"])
+    donor.user.is_active = False
+    donor.user.save(update_fields=["is_active"])
+
+
+@contextmanager
+def locked_donor(donor_id):
+    """US-09: use the same User -> Donor lock order as deletion and withdrawal."""
+    donor = find_donor(donor_id)
+    if donor is None:
+        yield None
+        return
+    with locked_contact(donor.user_id) as current:
+        yield current
+
+
+def donation_dates(donor_id, donation_type):
+    return list(
+        Donation.objects.filter(donor_id=donor_id, donation_type_id=donation_type)
+        .order_by("donation_date")
+        .values_list("donation_date", flat=True)
+    )
+
+
+def create_donation(**fields):
+    return Donation.objects.create(**fields)

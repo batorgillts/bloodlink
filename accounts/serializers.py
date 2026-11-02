@@ -48,6 +48,6 @@ class DonorRegistrationSerializer(serializers.Serializer):
         return value
 
     def validate_phone(self, value):
-        if not re.fullmatch(r"\d{10}", value):
+        if not re.fullmatch(r"[0-9]{10}", value):
             raise serializers.ValidationError("Phone number must be exactly 10 digits.")
         return value

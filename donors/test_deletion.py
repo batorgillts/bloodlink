@@ -205,10 +205,47 @@ class DeletionTests(TestCase):
         self.assert_unchanged()
 
     def test_get_and_post_do_not_delete(self):
+        self.assertEqual(self.client.get(self.donor_url).status_code, 200)
+        self.assertEqual(self.client.get(self.entry_url).status_code, 405)
         for url in (self.entry_url, self.donor_url):
-            self.assertEqual(self.client.get(url).status_code, 405)
             self.assertEqual(self.client.post(url, {"confirm": True}).status_code, 405)
             self.assert_unchanged()
+
+    def test_detail_supports_view_edit_delete_and_retained_history(self):
+        self.assertEqual(self.client.get(self.donor_url).status_code, 200)
+        updated = self.client.patch(self.donor_url, {"phone": "2125550199"}, format="json")
+        self.assertEqual(updated.status_code, 200)
+        self.assertEqual(updated.data["phone"], "2125550199")
+        self.assertEqual(self.remove(self.donor_url).status_code, 200)
+        detail = self.client.get(self.donor_url)
+        self.assertEqual(detail.status_code, 200)
+        self.assertEqual(detail.data["status"], "deleted")
+        self.assertEqual(len(detail.data["donations"]), 2)
+        for query in ({}, {"name": "Deletion"}, {"email": self.user.email},
+                      {"blood_type": "O+"}):
+            response = self.client.get("/api/donors/", query)
+            self.assertEqual(response.status_code, 200)
+            self.assertNotIn(self.donor.pk, [row["id"] for row in response.data])
+
+    def test_record_delete_and_rerecord_donation(self):
+        url = f"/api/donors/{self.other.pk}/donations/"
+        payload = {"donation_type": "whole_blood", "donation_date": "2026-01-01",
+                   "blood_type": "A+", "volume_ml": 450}
+        recorded = self.client.post(url, payload, format="json")
+        self.assertEqual(recorded.status_code, 201)
+        entry_id = recorded.data["donation"]["donation_id"]
+        self.assertEqual(self.remove(f"{url}{entry_id}/").status_code, 200)
+        self.assertEqual(self.client.post(url, payload, format="json").status_code, 201)
+        self.assertEqual(self.remove(f"/api/donors/{self.other.pk}/").status_code, 200)
+        self.assertEqual(self.client.post(url, payload, format="json").status_code, 409)
+
+    def test_withdraw_then_coordinator_delete_preserves_history(self):
+        self.authenticate(self.user)
+        withdrawn = self.client.post("/api/donors/me/withdraw/", {"confirm": True}, format="json")
+        self.assertEqual(withdrawn.status_code, 200)
+        self.authenticate(self.coordinator)
+        self.assertEqual(self.remove(self.donor_url).status_code, 200)
+        self.assertEqual(len(self.client.get(self.donor_url).data["donations"]), 2)
 
     def test_service_layer_also_rejects_donor_role(self):
         from rest_framework.exceptions import PermissionDenied

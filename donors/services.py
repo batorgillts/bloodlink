@@ -2,9 +2,10 @@
 
 from django.db import IntegrityError
 from django.utils import timezone
-from rest_framework.exceptions import NotFound, PermissionDenied
+from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 
 from accounts.models import User
+from accounts.services import create_donor_account
 from config.exceptions import Conflict
 
 from . import calculator, repository
@@ -50,6 +51,37 @@ def update_contact(donor, changes):
         # The database is the final guard if another account claimed the email
         # after the initial check. Check outside the rolled-back transaction.
         if email is not None and repository.email_in_use(email, user_id):
+            raise duplicate_email() from None
+        raise
+
+
+def search_donor_records(filters):
+    return repository.search_donors(**filters)
+
+
+def get_donor_record(donor_id):
+    donor = repository.find_donor(donor_id)
+    if donor is None:
+        raise NotFound("Donor record not found.")
+    return donor
+
+
+def create_walk_in_donor(data):
+    """US-08: create the same User/Donor pair as self-registration, without tokens."""
+    _user, donor = create_donor_account(**data)
+    return donor
+
+
+def update_donor_record(donor, changes):
+    email = changes.get("email")
+    try:
+        with repository.locked_contact(donor.user_id) as current:
+            if email is not None and repository.email_in_use(email, current.user_id):
+                raise duplicate_email()
+            repository.save_donor_record(current, changes)
+            return current
+    except IntegrityError:
+        if email is not None and repository.email_in_use(email, donor.user_id):
             raise duplicate_email() from None
         raise
 
@@ -171,3 +203,82 @@ def delete_donor(user, donor_id):
             "donor_id": current.pk,
             "status": current.status,
         }
+
+
+OWN_WITHDRAWAL_ONLY = "You can only withdraw your own registration."
+
+
+def withdraw_registration(user_id, donor_id=None):
+    """US-05: active donor confirms withdrawal. History stays linked to the donor."""
+    donor = repository.find_contact(user_id)
+    if donor is None:
+        raise NotFound("Donor profile not found.")
+    # A non-owned id is denied whether or not that id exists.
+    if donor_id is not None and donor_id != donor.pk:
+        raise PermissionDenied(OWN_WITHDRAWAL_ONLY)
+    ensure_active_donor(donor)
+    with repository.locked_contact(user_id) as current:
+        ensure_active_donor(current)
+        repository.mark_withdrawn(current)
+        return current
+
+
+INACTIVE_DONOR = "Donations can only be recorded for an active donor."
+
+
+def record_donation(donor_id, data, coordinator):
+    """US-09 implementation"""
+
+    rule = data["donation_type"]
+    donation_date = data["donation_date"]
+
+    with repository.locked_donor(donor_id) as donor:
+        if donor is None:
+            raise NotFound("Donor record not found.")
+        if donor.status != Donor.Status.ACTIVE or not donor.user.is_active:
+            raise Conflict(INACTIVE_DONOR)
+        if data["blood_type"] != donor.blood_type:
+            raise ValidationError(
+                {"blood_type": [f"Does not match the donor's blood type ({donor.blood_type})."]}
+            )
+        _check_interval(donor.pk, rule, donation_date)
+
+        donation = repository.create_donation(
+            donor=donor,
+            donation_type=rule,
+            donation_date=donation_date,
+            blood_type=data["blood_type"],
+            volume_ml=data["volume_ml"],
+            recorded_by=coordinator,
+        )
+
+    return {"donation": _donation_row(donation), **_eligibility_payload(donor, bank_today())}
+
+
+def _check_interval(donor_id, rule, donation_date):
+    dates = repository.donation_dates(donor_id, rule.donation_type)
+    # Same formula as US-04
+    on_that_day = calculator.calculate_eligibility(
+        rules=[(rule.donation_type, rule.min_interval_days)],
+        donations=[(rule.donation_type, d) for d in dates if d <= donation_date],
+        today=donation_date,
+    )[0]
+    if not on_that_day["eligible"]:
+        raise ValidationError(
+            {
+                "donation_date": [
+                    f"The donor is not eligible for {rule.donation_type} until "
+                    f"{on_that_day['next_eligible_date'].isoformat()}."
+                ]
+            }
+        )
+    later = [d for d in dates if d > donation_date]
+    if later and (later[0] - donation_date).days < rule.min_interval_days:
+        raise ValidationError(
+            {
+                "donation_date": [
+                    f"This date is within {rule.min_interval_days} days of the "
+                    f"{rule.donation_type} donation already recorded on {later[0].isoformat()}."
+                ]
+            }
+        )
