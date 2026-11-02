@@ -78,6 +78,8 @@ into `develop` or `main`.
 | GET / PATCH | `/api/donors/<donor_id>/` | View donor profile, donation history and eligibility; edit profile fields (US-08) | Coordinator |
 | POST | `/api/donors/` (`full_name`, `email`, `password`, `date_of_birth`, `blood_type`, `phone`) | Create a donor account and profile for a walk-in donor (US-08); returns the profile, not login tokens | Coordinator |
 | POST | `/api/donors/<donor_id>/donations/` (`donation_type`, `donation_date`, `blood_type`, `volume_ml`) | Record a donation entry (US-09); returns the entry with recalculated history and eligibility. 400 if invalid or not yet eligible, 409 if the donor is not active | Coordinator |
+| GET | `/api/requests/` | List all blood requests (US-11) | Coordinator |
+| POST | `/api/requests/` (`blood_type`, `component`, `quantity`) | Log a new blood request with `pending` status, coordinator and timestamp (US-11) | Coordinator |
 
 Protected endpoints require `Authorization: Bearer <access token>`.
 Without it they return 401. A signed-in donor calling a coordinator-only endpoint gets 403.
@@ -92,13 +94,16 @@ US-08 donor search, walk-in registration, profile updates, and coordinator-only
 record access are covered by `donors/test_records.py`.
 
 US-09 donation recording is covered by `donors/test_donations.py`.
+
+US-11 tests are in `request/test_records.py`.
 ## Project layout
 
 | Folder | Component (Sprint 2 C4 diagram) |
 |---|---|
 | `accounts/` | Authentication & Access: custom User with role, permissions, donor registration |
 | `donors/` | Donor & Donation Management: profile and own-contact API; services and repository for US-03 |
-| `config/` | Settings, URLs, shared exceptions, shared choices (blood types) |
+| `request/` | Incoming blood requests (US-11) |
+| `config/` | Settings, URLs, shared exceptions, shared choices (blood types and components) |
 
 ## Team workflow
 
