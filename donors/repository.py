@@ -55,10 +55,7 @@ def find_donor(donor_id):
 
 
 def search_donors(*, name=None, email=None, blood_type=None):
-    queryset = Donor.objects.select_related("user").filter(
-        user__role=User.Role.DONOR,
-        status=Donor.Status.ACTIVE,
-    )
+    queryset = active_donors().select_related("user")
     if name:
         queryset = queryset.filter(full_name__icontains=name)
     if email:
@@ -76,6 +73,30 @@ def donations_for(donor_id):
     return list(Donation.objects.filter(donor_id=donor_id).order_by("-donation_date", "-id"))
 
 
+def active_donors():
+    """Search/matching must use active profiles; history lookups must not."""
+    return Donor.objects.filter(
+        status=Donor.Status.ACTIVE, user__is_active=True, user__role=User.Role.DONOR
+    )
+
+
+def locked_donation(donor_id, donation_id):
+    return Donation.objects.select_for_update().filter(
+        pk=donation_id, donor_id=donor_id
+    ).first()
+
+
+def remove_donation(donation):
+    donation.delete()
+
+
+def deactivate_donor(donor):
+    donor.status = Donor.Status.DELETED
+    donor.save(update_fields=["status"])
+    donor.user.is_active = False
+    donor.user.save(update_fields=["is_active"])
+
+
 def mark_withdrawn(donor):
     """US-05: keep the donor row and its donations, and stop sign-in."""
     donor.status = Donor.Status.WITHDRAWN
@@ -86,10 +107,13 @@ def mark_withdrawn(donor):
 
 @contextmanager
 def locked_donor(donor_id):
-    """US-09: lock one donor row so two coordinators recording a donation for the same
-    donor at the same moment are checked one after the other (PostgreSQL row lock)."""
-    with transaction.atomic():
-        yield Donor.objects.select_for_update().select_related("user").filter(pk=donor_id).first()
+    """US-09: use the same User -> Donor lock order as deletion and withdrawal."""
+    donor = find_donor(donor_id)
+    if donor is None:
+        yield None
+        return
+    with locked_contact(donor.user_id) as current:
+        yield current
 
 
 def donation_dates(donor_id, donation_type):

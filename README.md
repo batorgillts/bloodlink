@@ -75,7 +75,7 @@ into `develop` or `main`.
 | GET / PATCH | `/api/donors/me/contact/` (`email` and/or `phone` for PATCH) | View or update own contact information (US-03) | Signed-in active donor |
 | GET / PATCH | `/api/donors/<donor_id>/contact/` | Same operation by donor profile ID; any other ID returns 403 | Owning active donor only |
 | GET | `/api/donors/?name=&email=&blood_type=` | Search donor records (US-08) | Coordinator |
-| GET / PATCH | `/api/donors/<donor_id>/` | View donor profile, donation history and eligibility; edit profile fields (US-08) | Coordinator |
+| GET / PATCH / DELETE | `/api/donors/<donor_id>/` | View/edit donor records (US-08); delete with `confirm: true`, retaining history (US-10) | Coordinator |
 | POST | `/api/donors/` (`full_name`, `email`, `password`, `date_of_birth`, `blood_type`, `phone`) | Create a donor account and profile for a walk-in donor (US-08); returns the profile, not login tokens | Coordinator |
 | POST | `/api/donors/me/withdraw/` (`confirm: true`) | Withdraw own registration: set donor status to `withdrawn`, deactivate sign-in, and keep donation history (US-05). 400 if confirmation is missing | Signed-in active donor |
 | POST | `/api/donors/<donor_id>/withdraw/` (`confirm: true`) | Same withdrawal by donor profile ID; any other ID returns 403 | Owning active donor only |
@@ -89,6 +89,18 @@ US-03 returns 400 for invalid contact input, 403 for non-owner/coordinator acces
 The email is the account's sign-in email; changing it changes the email used for future sign-ins.
 Only email and phone can be updated. See [US-03 implementation and demo](docs/US-03.md)
 for the API contract, acceptance tests, dependency on US-01, and frontend handoff.
+
+## US-10: coordinator deletion
+
+- `DELETE /api/donors/<donor_id>/donations/<donation_id>/`: remove one donation and
+  return recalculated eligibility and history.
+- `DELETE /api/donors/<donor_id>/`: mark a donor deleted and disable sign-in,
+  retaining linked donation history.
+- Both require a coordinator token and JSON `{"confirm": true}`. See
+  [US-10 API, tests and demo](docs/US-10.md) for errors and integration requirements.
+- US-08 search uses active donor filters and is tested with deletion. Matching
+  and React UI still need integration before the full story is Done.
+
 
 US-08 donor search, walk-in registration, profile updates, and coordinator-only
 record access are covered by `donors/test_records.py`.
