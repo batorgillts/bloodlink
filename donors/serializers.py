@@ -108,6 +108,34 @@ class DonorRecordUpdateSerializer(serializers.Serializer):
         return attrs
 
 
+class WithdrawConfirmationSerializer(serializers.Serializer):
+    """US-05: the account is withdrawn only after an explicit confirmation."""
+
+    confirm = serializers.BooleanField(
+        required=True,
+        error_messages={
+            "required": "Missing confirmation.",
+            "invalid": "Missing confirmation.",
+            "null": "Missing confirmation.",
+        },
+    )
+
+    def to_internal_value(self, data):
+        if not isinstance(data, dict):
+            raise serializers.ValidationError({"confirm": ["Missing confirmation."]})
+        unexpected = set(data) - set(self.fields)
+        if unexpected:
+            raise serializers.ValidationError(
+                {key: ["This field cannot be changed here."] for key in sorted(unexpected)}
+            )
+        return super().to_internal_value(data)
+
+    def validate_confirm(self, value):
+        if value is not True:
+            raise serializers.ValidationError("Missing confirmation.")
+        return value
+
+
 class DonationCreateSerializer(serializers.Serializer):
     """US-09"""
 
