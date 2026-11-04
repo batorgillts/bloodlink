@@ -82,6 +82,8 @@ into `develop` or `main`.
 | POST | `/api/donors/<donor_id>/donations/` (`donation_type`, `donation_date`, `blood_type`, `volume_ml`) | Record a donation entry (US-09); returns the entry with recalculated history and eligibility. 400 if invalid or not yet eligible, 409 if the donor is not active | Coordinator |
 | GET | `/api/requests/` | List all blood requests (US-11) | Coordinator |
 | POST | `/api/requests/` (`blood_type`, `component`, `quantity`) | Log a new blood request with `pending` status, coordinator and timestamp (US-11) | Coordinator |
+| POST | `/api/units/` (`unit_code`, `blood_type`, `component`, `collected_at`) | Record a blood unit; expiry is calculated from the component's shelf life (US-07). 400 for invalid input or a future collection time, 409 for a duplicate unit ID | Coordinator |
+| GET | `/api/units/?blood_type=&component=&status=` | View inventory, earliest expiry first; `status=available` excludes expired units (US-07) | Coordinator |
 
 Protected endpoints require `Authorization: Bearer <access token>`.
 Without it they return 401. A signed-in donor calling a coordinator-only endpoint gets 403.
@@ -120,6 +122,9 @@ including sign-in and token refresh, are 401.
 US-09 donation recording is covered by `donors/test_donations.py`.
 
 US-11 tests are in `request/test_records.py`.
+
+US-07 tests are in `inventory/tests.py`.
+
 ## Project layout
 
 | Folder | Component (Sprint 2 C4 diagram) |
@@ -127,6 +132,7 @@ US-11 tests are in `request/test_records.py`.
 | `accounts/` | Authentication & Access: custom User with role, permissions, donor registration |
 | `donors/` | Donor & Donation Management: profile and own-contact API; services and repository for US-03 |
 | `request/` | Incoming blood requests (US-11) |
+| `inventory/` | Inventory Management: blood units and shelf-life rules (US-07) |
 | `config/` | Settings, URLs, shared exceptions, shared choices (blood types and components) |
 
 ## Team workflow
