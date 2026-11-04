@@ -8,14 +8,16 @@ from accounts.permissions import IsCoordinator
 from accounts.serializers import DonorRegistrationSerializer
 
 from . import services
-from .permissions import CanViewEligibility, IsDonor
+from .permissions import CanViewEligibility, CanWithdrawRegistration, IsDonor
 from .serializers import (
     ContactSerializer,
     ContactUpdateSerializer,
+    DeleteConfirmationSerializer,
     DonationCreateSerializer,
     DonorRecordSerializer,
     DonorRecordUpdateSerializer,
     DonorSearchParamsSerializer,
+    WithdrawConfirmationSerializer,
 )
 
 
@@ -45,6 +47,15 @@ class EligibilityView(APIView):
         return Response(services.get_eligibility(request.user, donor_id))
 
 
+class DonationDeleteView(APIView):
+    permission_classes = [IsAuthenticated, IsCoordinator]
+
+    def delete(self, request, donor_id, donation_id):
+        confirmation = DeleteConfirmationSerializer(data=request.data)
+        confirmation.is_valid(raise_exception=True)
+        return Response(services.delete_donation(request.user, donor_id, donation_id))
+
+
 class DonorRecordListCreateView(APIView):
     """US-08: coordinator donor search and walk-in registration."""
 
@@ -68,7 +79,7 @@ class DonorRecordListCreateView(APIView):
 
 
 class DonorRecordDetailView(APIView):
-    """US-08: coordinator views and edits one donor record."""
+    """US-08/US-10: coordinator views, edits or soft-deletes a donor record."""
 
     permission_classes = [IsCoordinator]
 
@@ -84,6 +95,29 @@ class DonorRecordDetailView(APIView):
         donor = services.update_donor_record(donor, data.validated_data)
         return Response(DonorRecordSerializer(donor).data)
 
+    def delete(self, request, donor_id):
+        confirmation = DeleteConfirmationSerializer(data=request.data)
+        confirmation.is_valid(raise_exception=True)
+        return Response(services.delete_donor(request.user, donor_id))
+
+
+class WithdrawRegistrationView(APIView):
+    """US-05: POST confirmation to deactivate the signed-in donor's own account."""
+
+    permission_classes = [IsAuthenticated, CanWithdrawRegistration]
+
+    def post(self, request, donor_id=None):
+        data = WithdrawConfirmationSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        donor = services.withdraw_registration(request.user.pk, donor_id)
+        return Response(
+            {
+                "donor_id": donor.pk,
+                "status": donor.status,
+                "account_active": donor.user.is_active,
+                "donation_history_retained": True,
+            }
+        )
 
 
 class DonationCreateView(APIView):
@@ -94,9 +128,8 @@ class DonationCreateView(APIView):
     404: unknown donor
     409: donor not active
     """
+
     permission_classes = [IsCoordinator]
-
-
 
     def post(self, request, donor_id):
         data = DonationCreateSerializer(data=request.data)

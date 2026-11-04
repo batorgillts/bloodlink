@@ -17,7 +17,7 @@ Use Python 3.12, matching CI. The current Django 5.1 dependency does not support
 | Chenshuo Li | US-03: donor contact information (backend) | @KoharuLee |
 | Miaomiao Li | | |
 | Parvathi Krishnan |US-01(Backend: donor registration and donor records) |@parvathikrishnan11 |
-| Shuaiyu Chen | | |
+| Shuaiyu Chen | US-04: check donation eligibility (backend); US-05: withdraw donor registration (backend) | @CSY-Eason |
 
 **Course:** CS-GY 6063 Software Engineering I, NYU Tandon, Fall 2026
 **Instructor:** Raz Saremi
@@ -75,8 +75,10 @@ into `develop` or `main`.
 | GET / PATCH | `/api/donors/me/contact/` (`email` and/or `phone` for PATCH) | View or update own contact information (US-03) | Signed-in active donor |
 | GET / PATCH | `/api/donors/<donor_id>/contact/` | Same operation by donor profile ID; any other ID returns 403 | Owning active donor only |
 | GET | `/api/donors/?name=&email=&blood_type=` | Search donor records (US-08) | Coordinator |
-| GET / PATCH | `/api/donors/<donor_id>/` | View donor profile, donation history and eligibility; edit profile fields (US-08) | Coordinator |
+| GET / PATCH / DELETE | `/api/donors/<donor_id>/` | View/edit donor records (US-08); delete with `confirm: true`, retaining history (US-10) | Coordinator |
 | POST | `/api/donors/` (`full_name`, `email`, `password`, `date_of_birth`, `blood_type`, `phone`) | Create a donor account and profile for a walk-in donor (US-08); returns the profile, not login tokens | Coordinator |
+| POST | `/api/donors/me/withdraw/` (`confirm: true`) | Withdraw own registration: set donor status to `withdrawn`, deactivate sign-in, and keep donation history (US-05). 400 if confirmation is missing | Signed-in active donor |
+| POST | `/api/donors/<donor_id>/withdraw/` (`confirm: true`) | Same withdrawal by donor profile ID; any other ID returns 403 | Owning active donor only |
 | POST | `/api/donors/<donor_id>/donations/` (`donation_type`, `donation_date`, `blood_type`, `volume_ml`) | Record a donation entry (US-09); returns the entry with recalculated history and eligibility. 400 if invalid or not yet eligible, 409 if the donor is not active | Coordinator |
 
 Protected endpoints require `Authorization: Bearer <access token>`.
@@ -88,8 +90,30 @@ The email is the account's sign-in email; changing it changes the email used for
 Only email and phone can be updated. See [US-03 implementation and demo](docs/US-03.md)
 for the API contract, acceptance tests, dependency on US-01, and frontend handoff.
 
+## US-10: coordinator deletion
+
+- `DELETE /api/donors/<donor_id>/donations/<donation_id>/`: remove one donation and
+  return recalculated eligibility and history.
+- `DELETE /api/donors/<donor_id>/`: mark a donor deleted and disable sign-in,
+  retaining linked donation history.
+- Both require a coordinator token and JSON `{"confirm": true}`. See
+  [US-10 API, tests and demo](docs/US-10.md) for errors and integration requirements.
+- US-08 search uses active donor filters and is tested with deletion. Matching
+  and React UI still need integration before the full story is Done.
+
+
 US-08 donor search, walk-in registration, profile updates, and coordinator-only
 record access are covered by `donors/test_records.py`.
+
+US-05 withdraws the signed-in donor's own registration. The donor row stays, with
+status `withdrawn` and `User.is_active` set to false, so the same email and password
+can no longer sign in. Donation rows are not removed. Coordinator search already
+returns only `active` donors, so a withdrawn donor is left out of those results.
+A coordinator can still open that donor's record and donation history by id.
+See [US-05 implementation and demo](docs/US-05.md). Missing confirmation is 400.
+Another donor, a coordinator, or an already withdrawn or deleted profile is 403.
+A signed-in donor with no profile is 404. A withdrawn account's later requests,
+including sign-in and token refresh, are 401.
 
 US-09 donation recording is covered by `donors/test_donations.py`.
 ## Project layout

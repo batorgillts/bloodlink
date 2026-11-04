@@ -6,6 +6,19 @@ from config.choices import BloodType
 from .models import DonationIntervalRule, Donor
 
 
+class DeleteConfirmationSerializer(serializers.Serializer):
+    """Destructive requests require an explicit JSON boolean, not a truthy string."""
+
+    confirm = serializers.BooleanField()
+
+    def to_internal_value(self, data):
+        if not isinstance(data, dict) or data.get("confirm") is not True:
+            raise serializers.ValidationError({"confirm": ["Send confirm as JSON true."]})
+        if set(data) != {"confirm"}:
+            raise serializers.ValidationError({"non_field_errors": ["Only confirm is accepted."]})
+        return super().to_internal_value(data)
+
+
 class ContactSerializer(serializers.Serializer):
     """Only contact fields are exposed, never credentials or other donors' data."""
 
@@ -106,6 +119,34 @@ class DonorRecordUpdateSerializer(serializers.Serializer):
         if not attrs:
             raise serializers.ValidationError("Provide at least one donor field to update.")
         return attrs
+
+
+class WithdrawConfirmationSerializer(serializers.Serializer):
+    """US-05: the account is withdrawn only after an explicit confirmation."""
+
+    confirm = serializers.BooleanField(
+        required=True,
+        error_messages={
+            "required": "Missing confirmation.",
+            "invalid": "Missing confirmation.",
+            "null": "Missing confirmation.",
+        },
+    )
+
+    def to_internal_value(self, data):
+        if not isinstance(data, dict):
+            raise serializers.ValidationError({"confirm": ["Missing confirmation."]})
+        unexpected = set(data) - set(self.fields)
+        if unexpected:
+            raise serializers.ValidationError(
+                {key: ["This field cannot be changed here."] for key in sorted(unexpected)}
+            )
+        return super().to_internal_value(data)
+
+    def validate_confirm(self, value):
+        if value is not True:
+            raise serializers.ValidationError("Missing confirmation.")
+        return value
 
 
 class DonationCreateSerializer(serializers.Serializer):
