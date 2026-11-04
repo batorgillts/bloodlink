@@ -1,4 +1,6 @@
 from django.db import IntegrityError
+from django.db.models import Q
+from django.utils import timezone
 from rest_framework import generics
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
@@ -31,8 +33,24 @@ class BloodUnitListCreate(generics.ListCreateAPIView):
                 continue
             if value not in allowed:
                 raise ValidationError({field: f"Invalid filter. Allowed: {', '.join(allowed)}"})
-            queryset = queryset.filter(**{field: value})
+            queryset = self.filter_by(queryset, field, value)
         return queryset
+
+    @staticmethod
+    def filter_by(queryset, field, value):
+        if field != "status":
+            return queryset.filter(**{field: value})
+        # A unit past its expiry is expired even if its stored status still says
+        # available, so the status filter uses the effective status (AC2).
+        now = timezone.now()
+        if value == BloodUnit.Status.AVAILABLE:
+            return queryset.usable()
+        if value == BloodUnit.Status.EXPIRED:
+            return queryset.filter(
+                Q(status=BloodUnit.Status.EXPIRED)
+                | Q(status=BloodUnit.Status.AVAILABLE, expires_at__lte=now)
+            )
+        return queryset.filter(status=value)
 
     def perform_create(self, serializer):
         try:

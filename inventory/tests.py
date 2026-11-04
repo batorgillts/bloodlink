@@ -132,6 +132,15 @@ class ViewInventoryTests(TestCase):
         statuses = {u["unit_code"]: u["effective_status"] for u in res.data}
         self.assertEqual(statuses, {"U1": "available", "OLD": "expired"})
 
+    # adding the following tests to ensure that the filtering by status works correctly
+    def test_available_filter_excludes_expired_units(self):
+        res = self.client.get(URL, {"status": "available"})
+        self.assertEqual({u["unit_code"] for u in res.data}, {"U1", "U2"})
+
+    def test_expired_filter_includes_units_past_expiry(self):
+        res = self.client.get(URL, {"status": "expired"})
+        self.assertEqual({u["unit_code"] for u in res.data}, {"OLD"})
+
     def test_invalid_filter_returns_400(self):
         self.assertEqual(self.client.get(URL, {"status": "lost"}).status_code, 400)
 
