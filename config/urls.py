@@ -37,4 +37,6 @@ urlpatterns = [
     path("api/auth/register/", DonorRegistrationView.as_view(), name="register"),
     path("api/auth/token/", TokenObtainPairView.as_view(), name="token"),
     path("api/auth/token/refresh/", TokenRefreshView.as_view(), name="token-refresh"),
+    # Blood Request Management
+    path("api/requests/", include("request.urls")),
 ]

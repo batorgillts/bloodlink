@@ -32,6 +32,7 @@ INSTALLED_APPS = [
     "accounts",  # Authentication & Access
     "donors",  # Donor & Donation Management
     # "inventory" is added in PR 2, "allocation" in PR 3
+    "request",  # Blood request management
 ]
 
 MIDDLEWARE = [
