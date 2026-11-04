@@ -1,9 +1,9 @@
 from datetime import timedelta
-from datetime import timezone as dt_timezone
 
 from django.conf import settings
 from django.db import models
 from django.db.models import Q
+from django.utils import timezone
 
 from .choices import BloodType, Component
 
