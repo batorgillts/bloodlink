@@ -91,17 +91,15 @@ Without it they return 401. A signed-in donor calling a coordinator-only endpoin
 US-03 returns 400 for invalid contact input, 403 for non-owner/coordinator access,
 404 when the signed-in donor has no profile, and 409 for an email already in use.
 The email is the account's sign-in email; changing it changes the email used for future sign-ins.
-Only email and phone can be updated. See [US-03 implementation and demo](docs/US-03.md)
-for the API contract, acceptance tests, dependency on US-01, and frontend handoff.
+Only email and phone can be updated. 
 
-## US-10: coordinator deletion
+US-10-coordinator deletion:
 
 - `DELETE /api/donors/<donor_id>/donations/<donation_id>/`: remove one donation and
   return recalculated eligibility and history.
 - `DELETE /api/donors/<donor_id>/`: mark a donor deleted and disable sign-in,
   retaining linked donation history.
-- Both require a coordinator token and JSON `{"confirm": true}`. See
-  [US-10 API, tests and demo](docs/US-10.md) for errors and integration requirements.
+- Both require a coordinator token and JSON `{"confirm": true}`. 
 - US-08 search uses active donor filters and is tested with deletion. Matching
   and React UI still need integration before the full story is Done.
 
@@ -114,7 +112,7 @@ status `withdrawn` and `User.is_active` set to false, so the same email and pass
 can no longer sign in. Donation rows are not removed. Coordinator search already
 returns only `active` donors, so a withdrawn donor is left out of those results.
 A coordinator can still open that donor's record and donation history by id.
-See [US-05 implementation and demo](docs/US-05.md). Missing confirmation is 400.
+Missing confirmation is 400.
 Another donor, a coordinator, or an already withdrawn or deleted profile is 403.
 A signed-in donor with no profile is 404. A withdrawn account's later requests,
 including sign-in and token refresh, are 401.
