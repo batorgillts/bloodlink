@@ -68,7 +68,9 @@ class RecordBloodUnitTests(TestCase):
         collected = datetime(2026, 10, 1, 10, 0, tzinfo=timezone.get_current_timezone())
         self.client.post(URL, self.payload(collected_at=collected.isoformat()), format="json")
         expires = timezone.localtime(BloodUnit.objects.get().expires_at)
-        self.assertEqual((expires.month, expires.day, expires.hour, expires.minute), (11, 12, 10, 0))
+        self.assertEqual(
+            (expires.month, expires.day, expires.hour, expires.minute), (11, 12, 10, 0)
+        )
 
     def test_expiry_cannot_be_typed_in(self):
         typed = (timezone.now() + timedelta(days=999)).isoformat()
