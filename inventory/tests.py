@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from django.db import IntegrityError
 from django.test import TestCase
@@ -54,27 +54,27 @@ class RecordBloodUnitTests(TestCase):
         res = self.client.post(URL, self.payload(), format="json")
         self.assertEqual(res.status_code, 201)
         unit = BloodUnit.objects.get(unit_code="BL-0001")  # normalized to upper case
-        self.assertEqual(unit.expires_at, self.collected + timedelta(days=42))
+        self.assertEqual(unit.expires_at, timezone.localtime(self.collected) + timedelta(days=42))
         self.assertEqual(unit.status, "available")
         self.assertEqual(unit.created_by, self.coordinator)
 
     def test_platelets_expire_after_five_days(self):
         self.client.post(URL, self.payload(component="PLATELETS"), format="json")
         unit = BloodUnit.objects.get()
-        self.assertEqual(unit.expires_at, self.collected + timedelta(days=5))
+        self.assertEqual(unit.expires_at, timezone.localtime(self.collected) + timedelta(days=5))
 
-    def test_expiry_is_exact_across_daylight_saving_change(self):
-        # Collected before the Nov 1 clock change, expires after it.
-        collected = timezone.datetime(2026, 10, 20, 12, 0, tzinfo=timezone.get_current_timezone())
+    def test_ac1_oct_1_10am_expires_nov_12_10am(self):
+        # AC1 example: the Nov 1 clock change must not shift the expiry time.
+        collected = datetime(2026, 10, 1, 10, 0, tzinfo=timezone.get_current_timezone())
         self.client.post(URL, self.payload(collected_at=collected.isoformat()), format="json")
-        unit = BloodUnit.objects.get()
-        self.assertEqual(unit.expires_at - unit.collected_at, timedelta(days=42))
+        expires = timezone.localtime(BloodUnit.objects.get().expires_at)
+        self.assertEqual((expires.month, expires.day, expires.hour, expires.minute), (11, 12, 10, 0))
 
     def test_expiry_cannot_be_typed_in(self):
         typed = (timezone.now() + timedelta(days=999)).isoformat()
         self.client.post(URL, self.payload(expires_at=typed), format="json")
         unit = BloodUnit.objects.get()
-        self.assertEqual(unit.expires_at, self.collected + timedelta(days=42))
+        self.assertEqual(unit.expires_at, timezone.localtime(self.collected) + timedelta(days=42))
 
     def test_duplicate_unit_id_returns_409(self):
         self.client.post(URL, self.payload(), format="json")

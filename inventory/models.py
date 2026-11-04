@@ -4,7 +4,6 @@ from datetime import timezone as dt_timezone
 from django.conf import settings
 from django.db import models
 from django.db.models import Q
-from django.utils import timezone
 
 from .choices import BloodType, Component
 
@@ -85,10 +84,10 @@ class BloodUnit(models.Model):
         # Expiry is calculated from the shelf-life rule, never typed in (US-07).
         if self.expires_at is None:
             rule = ShelfLifeRule.objects.get(component=self.component)
-            # Do the math in UTC: adding days to a local time that crosses a daylight
-            # saving change would shift expiry by an hour.
-            collected_utc = self.collected_at.astimezone(dt_timezone.utc)
-            self.expires_at = collected_utc + timedelta(days=rule.shelf_life_days)
+            # Add days on the local wall clock (TIME_ZONE), so a unit collected at
+            # 10:00 AM expires at 10:00 AM even across a daylight saving change (AC1).
+            collected_local = timezone.localtime(self.collected_at)
+            self.expires_at = collected_local + timedelta(days=rule.shelf_life_days)
         super().save(*args, **kwargs)
 
     @property
