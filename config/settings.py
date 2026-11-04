@@ -29,7 +29,8 @@ INSTALLED_APPS = [
     # BloodLink components (Sprint 2 C4 diagram)
     "accounts",  # Authentication & Access
     "donors",  # Donor & Donation Management
-    "inventory",  # inventory management
+    "inventory",  # Inventory Management
+    "request",  # Blood request management
 ]
 
 MIDDLEWARE = [
