@@ -21,6 +21,7 @@ from django.urls import include, path
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from accounts.views import DonorRegistrationView
+from inventory import views as inventory_views
 
 
 # Sign-in returns a JWT (US-02, US-06); /api/health/ is a quick uptime check.
@@ -37,6 +38,8 @@ urlpatterns = [
     path("api/auth/register/", DonorRegistrationView.as_view(), name="register"),
     path("api/auth/token/", TokenObtainPairView.as_view(), name="token"),
     path("api/auth/token/refresh/", TokenRefreshView.as_view(), name="token-refresh"),
+    # Inventory Management (US-07)
+    path("api/units/", inventory_views.BloodUnitListCreate.as_view(), name="units"),
     # Blood Request Management
     path("api/requests/", include("request.urls")),
 ]

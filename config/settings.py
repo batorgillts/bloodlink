@@ -12,9 +12,7 @@ import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.environ.get(
-    "SECRET_KEY", "dev-only-insecure-key-change-me-in-production-0000"
-)
+SECRET_KEY = os.environ.get("SECRET_KEY", "dev-only-insecure-key-change-me-in-production-0000")
 DEBUG = os.environ.get("DEBUG", "True") == "True"
 ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
 
@@ -31,7 +29,7 @@ INSTALLED_APPS = [
     # BloodLink components (Sprint 2 C4 diagram)
     "accounts",  # Authentication & Access
     "donors",  # Donor & Donation Management
-    # "inventory" is added in PR 2, "allocation" in PR 3
+    "inventory",  # Inventory Management
     "request",  # Blood request management
 ]
 
