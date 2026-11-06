@@ -84,6 +84,8 @@ into `develop` or `main`.
 | POST | `/api/requests/` (`blood_type`, `component`, `quantity`) | Log a new blood request with `pending` status, coordinator and timestamp (US-11) | Coordinator |
 | POST | `/api/units/` (`unit_code`, `blood_type`, `component`, `collected_at`) | Record a blood unit; expiry is calculated from the component's shelf life (US-07). 400 for invalid input or a future collection time, 409 for a duplicate unit ID | Coordinator |
 | GET | `/api/units/?blood_type=&component=&status=` | View inventory, earliest expiry first; `status=available` excludes expired units (US-07) | Coordinator |
+| POST | `/api/requests/<request_id>/cancel/` (`confirm: true`) | Cancel a pending or partially fulfilled request and release its reserved units (US-19); expired units remain expired | Coordinator |
+| GET | `/api/requests/<request_id>/history/` | View a request's event history, including cancellation time and coordinator (US-19) | Coordinator |
 
 Protected endpoints require `Authorization: Bearer <access token>`.
 Without it they return 401. A signed-in donor calling a coordinator-only endpoint gets 403.
@@ -124,6 +126,8 @@ US-09 donation recording is covered by `donors/test_donations.py`.
 US-11 tests are in `request/test_records.py`.
 
 US-07 tests are in `inventory/tests.py`.
+
+US-19 tests are in `request/test_cancellation.py`.
 
 ## Project layout
 
