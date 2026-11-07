@@ -5,8 +5,8 @@ from rest_framework.views import APIView
 
 from accounts.permissions import IsCoordinator
 
-from . import services
-from .serializers import BloodRequestSerializer
+from . import matching, services
+from .serializers import BloodRequestSerializer, MatchedUnitSerializer
 
 
 class BloodRequestListCreateView(APIView):
@@ -25,4 +25,20 @@ class BloodRequestListCreateView(APIView):
         return Response(
             BloodRequestSerializer(record).data,
             status=status.HTTP_201_CREATED,
+        )
+
+
+class BloodRequestMatchView(APIView):
+    """Suggest compatible units without reserving or changing inventory."""
+
+    permission_classes = [IsAuthenticated, IsCoordinator]
+
+    def get(self, request, request_id):
+        units = MatchedUnitSerializer(matching.match_blood_request(request_id), many=True).data
+        return Response(
+            {
+                "request_id": request_id,
+                "units": units,
+                "message": "" if units else "No compatible units available",
+            }
         )

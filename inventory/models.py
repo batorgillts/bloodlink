@@ -99,3 +99,32 @@ class BloodUnit(models.Model):
 
     def __str__(self):
         return f"{self.unit_code} ({self.blood_type} {self.component})"
+
+
+class CompatibilityRule(models.Model):
+    """Configured unit-to-request compatibility, scoped to a component."""
+
+    component = models.CharField(max_length=10, choices=Component.choices)
+    request_blood_type = models.CharField(max_length=3, choices=BloodType.choices)
+    unit_blood_type = models.CharField(max_length=3, choices=BloodType.choices)
+    is_identical = models.BooleanField()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["component", "request_blood_type", "unit_blood_type"],
+                name="compatibility_rule_unique",
+            ),
+            models.CheckConstraint(
+                condition=Q(component__in=Component.values),
+                name="compatibility_component_valid",
+            ),
+            models.CheckConstraint(
+                condition=Q(request_blood_type__in=BloodType.values),
+                name="compatibility_request_type_valid",
+            ),
+            models.CheckConstraint(
+                condition=Q(unit_blood_type__in=BloodType.values),
+                name="compatibility_unit_type_valid",
+            ),
+        ]
