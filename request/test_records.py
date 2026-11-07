@@ -11,7 +11,7 @@ PASSWORD = "TestPassword123"
 
 
 class BloodRequestApiTests(TestCase):
-    """US-11: coordinator request logging, listing, filtering, and permissions."""
+    """US-11: coordinator request logging, listing, and permissions."""
 
     @classmethod
     def setUpTestData(cls):
