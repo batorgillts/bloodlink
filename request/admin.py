@@ -38,6 +38,9 @@ class ReservationAdmin(admin.ModelAdmin):
         "release_reason",
     )
 
+    def has_delete_permission(self, request, obj=None):
+        return False
+
 
 @admin.register(RequestEvent)
 class RequestEventAdmin(admin.ModelAdmin):
