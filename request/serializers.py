@@ -1,5 +1,7 @@
 from rest_framework import serializers
 
+from inventory.models import BloodUnit
+
 from .models import BloodRequest, RequestEvent
 
 
@@ -47,4 +49,13 @@ class RequestEventSerializer(serializers.ModelSerializer):
             "actor",
             "actor_email",
         ]
+        read_only_fields = fields
+
+
+class MatchedUnitSerializer(serializers.ModelSerializer):
+    is_identical = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = BloodUnit
+        fields = ["id", "unit_code", "blood_type", "component", "expires_at", "is_identical"]
         read_only_fields = fields

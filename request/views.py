@@ -5,10 +5,11 @@ from rest_framework.views import APIView
 
 from accounts.permissions import IsCoordinator
 
-from . import services
+from . import matching, services
 from .serializers import (
     BloodRequestSerializer,
     ConfirmCancelSerializer,
+    MatchedUnitSerializer,
     RequestEventSerializer,
 )
 
@@ -60,3 +61,19 @@ class BloodRequestHistoryView(APIView):
     def get(self, request, request_id):
         events = services.get_request_history(request_id)
         return Response(RequestEventSerializer(events, many=True).data)
+
+
+class BloodRequestMatchView(APIView):
+    """Suggest compatible units without reserving or changing inventory."""
+
+    permission_classes = [IsAuthenticated, IsCoordinator]
+
+    def get(self, request, request_id):
+        units = MatchedUnitSerializer(matching.match_blood_request(request_id), many=True).data
+        return Response(
+            {
+                "request_id": request_id,
+                "units": units,
+                "message": "" if units else "No compatible units available",
+            }
+        )

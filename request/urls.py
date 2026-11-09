@@ -4,9 +4,15 @@ from .views import (
     BloodRequestCancelView,
     BloodRequestHistoryView,
     BloodRequestListCreateView,
+    BloodRequestMatchView,
 )
 
 urlpatterns = [
+    path(
+        "<int:request_id>/matches/",
+        BloodRequestMatchView.as_view(),
+        name="blood-request-matches",
+    ),
     path("", BloodRequestListCreateView.as_view(), name="blood-request-list-create"),
     path(
         "<int:request_id>/cancel/",
