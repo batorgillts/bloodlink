@@ -84,6 +84,7 @@ into `develop` or `main`.
 | POST | `/api/requests/` (`blood_type`, `component`, `quantity`) | Log a new blood request with `pending` status, coordinator and timestamp (US-11) | Coordinator |
 | POST | `/api/units/` (`unit_code`, `blood_type`, `component`, `collected_at`) | Record a blood unit; expiry is calculated from the component's shelf life (US-07). 400 for invalid input or a future collection time, 409 for a duplicate unit ID | Coordinator |
 | GET | `/api/units/?blood_type=&component=&status=` | View inventory, earliest expiry first; `status=available` excludes expired units (US-07) | Coordinator |
+| GET | `/api/requests/<request_id>/matches/` | Match available, unexpired units for one request. Red blood cells use ABO/Rh rules (US-13); plasma uses reversed ABO and ignores Rh (US-14). An empty match returns `No compatible units available` | Coordinator |
 | POST | `/api/requests/<request_id>/cancel/` (`confirm: true`) | Cancel a pending or partially fulfilled request and release its reserved units (US-19); expired units remain expired | Coordinator |
 | GET | `/api/requests/<request_id>/history/` | View a request's event history, including cancellation time and coordinator (US-19) | Coordinator |
 
@@ -124,6 +125,17 @@ including sign-in and token refresh, are 401.
 US-09 donation recording is covered by `donors/test_donations.py`.
 
 US-11 tests are in `request/test_records.py`.
+
+US-13 matches a Red Blood Cells request at `GET /api/requests/<request_id>/matches/`.
+The rules are seeded `CompatibilityRule` rows, not hard-coded in the view. O-negative
+units are compatible with every requested type, and an AB-positive request accepts
+every blood type. An A-positive request returns A+, A-, O+, and O- units. An
+O-negative request returns only O-negative units. Exact type is listed before
+compatible substitutes, then earliest expiry. Each unit includes its id, unit code,
+blood type, and expiry. Plasma, platelets, expired, reserved, and discarded units
+are left out. Matching does not reserve units or change the request. A donor gets
+403, a missing token gets 401, and an unknown request gets 404. Tests are in
+`request/test_rbc_matching.py`.
 
 US-07 tests are in `inventory/tests.py`.
 
