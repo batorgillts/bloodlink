@@ -50,6 +50,15 @@ class BloodUnit(models.Model):
     discard_reason = models.CharField(
         max_length=20, choices=DiscardReason.choices, blank=True, default=""
     )
+    # wastage is recorded with when and by whom, not just the reason.
+    discarded_at = models.DateTimeField(null=True, blank=True)
+    discarded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, related_name="+"
     )
@@ -96,6 +105,11 @@ class BloodUnit(models.Model):
         if self.status == self.Status.AVAILABLE and self.expires_at <= timezone.now():
             return self.Status.EXPIRED
         return self.status
+
+    @property
+    def can_discard(self):
+        """the discard option is not offered again."""
+        return self.status != self.Status.DISCARDED
 
     def __str__(self):
         return f"{self.unit_code} ({self.blood_type} {self.component})"

@@ -40,6 +40,13 @@ urlpatterns = [
     path("api/auth/token/refresh/", TokenRefreshView.as_view(), name="token-refresh"),
     # Inventory Management (US-07)
     path("api/units/", inventory_views.BloodUnitListCreate.as_view(), name="units"),
+    path("api/units/<int:unit_id>/", inventory_views.BloodUnitDetail.as_view(), name="unit-detail"),
+    # US-17
+    path(
+        "api/units/<int:unit_id>/discard/",
+        inventory_views.BloodUnitDiscard.as_view(),
+        name="unit-discard",
+    ),
     # Blood Request Management
     path("api/requests/", include("request.urls")),
 ]

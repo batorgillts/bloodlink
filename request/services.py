@@ -79,6 +79,53 @@ def cancel_blood_request(request_id, coordinator):
     return blood_request, released_units
 
 
+def lock_request_reserving_unit(unit_id):
+    reservation = repository.active_reservation_for_unit(unit_id)
+    if reservation is None:
+        return None
+    return repository.request_for_update(reservation.request_id)
+
+
+def release_reservation_for_discard(unit, coordinator, released_at, locked_request):
+
+    reservation = repository.active_reservation_for_unit(unit.pk, lock=True)
+    if reservation is None:
+        return None
+    if locked_request is None or reservation.request_id != locked_request.pk:
+        # Reserved for a different request between our two reads: ask to retry.
+        raise Conflict("This unit's reservation just changed. Please try again.")
+
+    reservation.released_at = released_at
+    reservation.release_reason = Reservation.ReleaseReason.DISCARDED
+    repository.save_reservation_release(reservation)
+    repository.create_request_event(
+        request=locked_request,
+        event_type=RequestEvent.EventType.RELEASED,
+        unit=unit,
+        created_at=released_at,
+        actor=coordinator,
+    )
+
+
+    previous_status = locked_request.status
+    remaining = repository.count_active_reservations(locked_request.pk)
+    new_status = (
+        BloodRequest.Status.PARTIALLY_FULFILLED if remaining else BloodRequest.Status.PENDING
+    )
+    if new_status != previous_status:
+        locked_request.status = new_status
+        repository.save_request_status(locked_request)
+        repository.create_request_event(
+            request=locked_request,
+            event_type=RequestEvent.EventType.STATUS_CHANGED,
+            from_status=previous_status,
+            to_status=new_status,
+            created_at=released_at,
+            actor=coordinator,
+        )
+    return locked_request
+
+
 def get_request_history(request_id):
     if not repository.find_request(request_id):
         raise NotFound("Blood request not found.")
