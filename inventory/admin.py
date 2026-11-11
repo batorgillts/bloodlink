@@ -15,7 +15,7 @@ class BloodUnitAdmin(admin.ModelAdmin):
         "discarded_at",
     )
     list_filter = ("component", "blood_type", "status", "discard_reason")
-    readonly_fields = ("discarded_at", "discarded_by")
+    readonly_fields = ("status", "discard_reason", "discarded_at", "discarded_by")
     search_fields = ("unit_code",)
 
 

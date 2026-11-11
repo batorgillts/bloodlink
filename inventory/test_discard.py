@@ -229,3 +229,14 @@ class DiscardUnitTests(TestCase):
     def test_confirm_is_not_needed_for_an_available_unit(self):
         unit = self.unit()
         self.assertEqual(self.discard(unit, confirm=False).status_code, 200)
+
+    def test_admin_cannot_edit_status_or_discard_fields(self):
+        admin_user = User.objects.create_superuser("admin@example.com", PASSWORD)
+        unit = self.unit()
+        self.client.force_login(admin_user)
+        res = self.client.get(f"/admin/inventory/bloodunit/{unit.pk}/change/")
+        self.assertEqual(res.status_code, 200)
+        for field in ("status", "discard_reason", "discarded_at", "discarded_by"):
+            with self.subTest(field=field):
+                self.assertNotContains(res, f'name="{field}"')
+        self.assertContains(res, 'name="unit_code"')
