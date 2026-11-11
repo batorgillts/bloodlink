@@ -84,6 +84,8 @@ into `develop` or `main`.
 | POST | `/api/requests/` (`blood_type`, `component`, `quantity`) | Log a new blood request with `pending` status, coordinator and timestamp (US-11) | Coordinator |
 | POST | `/api/units/` (`unit_code`, `blood_type`, `component`, `collected_at`) | Record a blood unit; expiry is calculated from the component's shelf life (US-07). 400 for invalid input or a future collection time, 409 for a duplicate unit ID | Coordinator |
 | GET | `/api/units/?blood_type=&component=&status=` | View inventory, earliest expiry first; `status=available` excludes expired units (US-07) | Coordinator |
+| GET | `/api/units/<unit_id>/` | View one unit, including discard details and `can_discard` (false once discarded) | Coordinator |
+| POST | `/api/units/<unit_id>/discard/` (`reason`, `confirm`) | Discard a unit with reason `expired`, `damaged`, `failed_testing` or `other` (US-17). 400 if the reason is missing, or not `expired` for an expired unit; 409 if already discarded; 409 with `confirm_required` and the request ID if the unit is reserved, until sent again with `confirm: true`. Releases the reservation and sets the request to partially fulfilled (or pending if none left) | Coordinator |
 | POST | `/api/requests/<request_id>/cancel/` (`confirm: true`) | Cancel a pending or partially fulfilled request and release its reserved units (US-19); expired units remain expired | Coordinator |
 | GET | `/api/requests/<request_id>/history/` | View a request's event history, including cancellation time and coordinator (US-19) | Coordinator |
 
@@ -128,6 +130,8 @@ US-11 tests are in `request/test_records.py`.
 US-07 tests are in `inventory/tests.py`.
 
 US-19 tests are in `request/test_cancellation.py`.
+
+US-17 tests are in `inventory/test_discard.py`.
 
 ## Project layout
 
