@@ -36,6 +36,17 @@ def active_reservations_for_update(request_id):
     )
 
 
+def active_reservation_for_unit(unit_id, *, lock=False):
+    reservations = Reservation.objects.filter(unit_id=unit_id, released_at__isnull=True)
+    if lock:
+        reservations = reservations.select_for_update()
+    return reservations.first()
+
+
+def count_active_reservations(request_id):
+    return Reservation.objects.filter(request_id=request_id, released_at__isnull=True).count()
+
+
 def unit_for_update(unit_id):
     return BloodUnit.objects.select_for_update().get(pk=unit_id)
 

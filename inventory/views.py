@@ -1,16 +1,19 @@
 from django.db import IntegrityError
 from django.db.models import Q
 from django.utils import timezone
-from rest_framework import generics
+from rest_framework import generics, status
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from accounts.permissions import IsCoordinator
 from config.exceptions import Conflict
 
+from . import services
 from .choices import BloodType, Component
 from .models import BloodUnit
-from .serializers import BloodUnitSerializer
+from .serializers import BloodUnitSerializer, DiscardUnitSerializer
 
 FILTERS = {
     "blood_type": BloodType.values,
@@ -58,3 +61,45 @@ class BloodUnitListCreate(generics.ListCreateAPIView):
         except IntegrityError as exc:
             # Two coordinators submitting the same unit ID at the same moment.
             raise Conflict("A unit with this ID already exists.") from exc
+
+
+class BloodUnitDetail(generics.RetrieveAPIView):
+    """View one unit; can_discard is false once it is Discarded"""
+
+    queryset = BloodUnit.objects.all()
+    serializer_class = BloodUnitSerializer
+    permission_classes = [IsAuthenticated, IsCoordinator]
+    lookup_url_kwarg = "unit_id"
+
+
+class BloodUnitDiscard(APIView):
+    """discard a unit with a reason; a reserved unit needs confirm: true."""
+
+    permission_classes = [IsAuthenticated, IsCoordinator]
+
+    def post(self, request, unit_id):
+        data = DiscardUnitSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        try:
+            unit, affected_request = services.discard_unit(
+                unit_id, coordinator=request.user, **data.validated_data
+            )
+        except services.ConfirmationRequired as warning:
+            return Response(
+                {
+                    "detail": str(warning),
+                    "request_id": warning.request_id,
+                    "confirm_required": True,
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+        return Response(
+            {
+                "unit": BloodUnitSerializer(unit).data,
+                "request": (
+                    {"id": affected_request.pk, "status": affected_request.status}
+                    if affected_request
+                    else None
+                ),
+            }
+        )
