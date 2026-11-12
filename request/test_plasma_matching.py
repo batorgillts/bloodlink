@@ -135,10 +135,11 @@ class PlasmaMatchingTests(TestCase):
     def test_missing_request_is_not_found(self):
         self.assertEqual(self.client.get("/api/requests/999999/matches/").status_code, 404)
 
-    def test_other_components_do_not_fall_back_to_plasma_rules(self):
-        # RBC matching is US-13 and reads its own rules. Platelets stay unimplemented.
-        for component in (Component.PLATELETS,):
-            with self.subTest(component=component):
-                self.request.component = component
-                self.request.save()
-                self.assertEqual(self.client.get(self.url).status_code, 400)
+    def test_platelets_use_their_own_rules_instead_of_plasma_rules(self):
+        self.request.component = Component.PLATELETS
+        self.request.save()
+        allowed = self.unit("O+", component=Component.PLATELETS)
+        self.unit("AB+", component=Component.PLATELETS)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([row["id"] for row in response.data["units"]], [allowed.pk])
