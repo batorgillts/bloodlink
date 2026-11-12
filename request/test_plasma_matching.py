@@ -136,7 +136,8 @@ class PlasmaMatchingTests(TestCase):
         self.assertEqual(self.client.get("/api/requests/999999/matches/").status_code, 404)
 
     def test_other_components_do_not_fall_back_to_plasma_rules(self):
-        for component in (Component.RED_BLOOD_CELLS, Component.PLATELETS):
+        # RBC matching is US-13 and reads its own rules. Platelets stay unimplemented.
+        for component in (Component.PLATELETS,):
             with self.subTest(component=component):
                 self.request.component = component
                 self.request.save()
