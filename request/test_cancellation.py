@@ -156,7 +156,10 @@ class BloodRequestCancellationApiTests(TestCase):
     def test_cancellation_days_after_reservation_expiry_keeps_unit_expired(self):
         blood_request = self.create_request()
         unit = self.create_reserved_unit("US19-EXPIRED-AFTER-RESERVATION")
-        reservation = self.reserve(blood_request, unit)
+        # Sequential writes can share a clock tick; make this scenario deterministic.
+        reserved_at = blood_request.logged_at + timedelta(seconds=1)
+        with patch("django.utils.timezone.now", return_value=reserved_at):
+            reservation = self.reserve(blood_request, unit)
         expiry_time = reservation.reserved_at + timedelta(days=2)
         cancellation_time = reservation.reserved_at + timedelta(days=5)
         BloodUnit.objects.filter(pk=unit.pk).update(expires_at=expiry_time)

@@ -1,5 +1,6 @@
 from rest_framework import serializers
 
+from config.choices import Component
 from inventory.models import BloodUnit
 
 from .models import BloodRequest, RequestEvent
@@ -59,3 +60,11 @@ class MatchedUnitSerializer(serializers.ModelSerializer):
         model = BloodUnit
         fields = ["id", "unit_code", "blood_type", "component", "expires_at", "is_identical"]
         read_only_fields = fields
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if instance.component == Component.PLATELETS:
+            data["match_label"] = (
+                "ABO-identical" if instance.is_identical else "ABO-compatible, not identical"
+            )
+        return data
