@@ -132,11 +132,14 @@ def compatible_donors(blood_request, donation_type):
         )
         .order_by("-is_identical", "full_name", "id")
     )
+
+
 def units_for_update(unit_ids):
     """Lock the selected units in id order, so two reservations never deadlock."""
     return list(BloodUnit.objects.select_for_update().filter(pk__in=unit_ids).order_by("pk"))
 
-def compatible_units_types(blood_request):
+
+def compatible_unit_types(blood_request):
     return set(
         CompatibilityRule.objects.filter(
             component=blood_request.component,
@@ -144,5 +147,6 @@ def compatible_units_types(blood_request):
         ).values_list("unit_blood_type", flat=True)
     )
 
+
 def create_reservation(*, request, unit, reserved_by):
-    return Reservation.objects.create(request = request, unit = unit, reserved_by = reserved_by)
+    return Reservation.objects.create(request=request, unit=unit, reserved_by=reserved_by)
