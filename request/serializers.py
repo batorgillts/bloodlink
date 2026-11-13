@@ -9,12 +9,14 @@ ALLOWED_REQUEST_STATUSES = ", ".join(BloodRequest.Status.values)
 
 
 class BloodRequestListParamsSerializer(serializers.Serializer):
-    status = serializers.ChoiceField(
-        choices=BloodRequest.Status.choices,
+    status = serializers.ListField(
+        child=serializers.ChoiceField(
+            choices=BloodRequest.Status.choices,
+            error_messages={
+                "invalid_choice": f"Invalid filter. Allowed: {ALLOWED_REQUEST_STATUSES}"
+            },
+        ),
         required=False,
-        error_messages={
-            "invalid_choice": f"Invalid filter. Allowed: {ALLOWED_REQUEST_STATUSES}"
-        },
     )
 
 

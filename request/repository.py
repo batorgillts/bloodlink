@@ -11,7 +11,7 @@ from .models import BloodRequest, RequestEvent, Reservation
 def list_blood_requests(*, status=None):
     requests = BloodRequest.objects.select_related("logged_by").all()
     if status is not None:
-        requests = requests.filter(status=status)
+        requests = requests.filter(status__in=status)
     return requests
 
 

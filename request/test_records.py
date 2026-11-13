@@ -132,11 +132,27 @@ class BloodRequestApiTests(TestCase):
         self.assertEqual({row["id"] for row in response.data}, pending_ids)
         self.assertEqual({row["status"] for row in response.data}, {BloodRequest.Status.PENDING})
 
+    def test_list_can_filter_by_multiple_statuses(self):
+        pending = self.make_request(status=BloodRequest.Status.PENDING)
+        partial = self.make_request(status=BloodRequest.Status.PARTIALLY_FULFILLED)
+        fulfilled = self.make_request(status=BloodRequest.Status.FULFILLED)
+        self.make_request(status=BloodRequest.Status.CANCELLED)
+
+        response = self.client.get(
+            f"{LIST_URL}?status=pending&status=partially_fulfilled&status=fulfilled"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            {row["id"] for row in response.data},
+            {pending.pk, partial.pk, fulfilled.pk},
+        )
+
     def test_list_rejects_unknown_status_and_lists_allowed_values(self):
         response = self.client.get(LIST_URL, {"status": "lost"})
 
         self.assertEqual(response.status_code, 400)
-        error = " ".join(response.data["status"])
+        error = str(response.data["status"])
         for allowed in BloodRequest.Status.values:
             self.assertIn(allowed, error)
 
