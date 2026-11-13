@@ -80,7 +80,7 @@ into `develop` or `main`.
 | POST | `/api/donors/me/withdraw/` (`confirm: true`) | Withdraw own registration: set donor status to `withdrawn`, deactivate sign-in, and keep donation history (US-05). 400 if confirmation is missing | Signed-in active donor |
 | POST | `/api/donors/<donor_id>/withdraw/` (`confirm: true`) | Same withdrawal by donor profile ID; any other ID returns 403 | Owning active donor only |
 | POST | `/api/donors/<donor_id>/donations/` (`donation_type`, `donation_date`, `blood_type`, `volume_ml`) | Record a donation entry (US-09); returns the entry with recalculated history and eligibility. 400 if invalid or not yet eligible, 409 if the donor is not active | Coordinator |
-| GET | `/api/requests/` | List all blood requests (US-11) | Coordinator |
+| GET | `/api/requests/?status=<value>` | List all blood requests by default; repeat `status` to filter by multiple values, such as `?status=pending&status=fulfilled`. Status values are case-sensitive and must be lowercase: `pending`, `partially_fulfilled`, `fulfilled`, `cancelled`; invalid values return 400 (US-11) | Coordinator |
 | POST | `/api/requests/` (`blood_type`, `component`, `quantity`) | Log a new blood request with `pending` status, coordinator and timestamp (US-11) | Coordinator |
 | POST | `/api/units/` (`unit_code`, `blood_type`, `component`, `collected_at`) | Record a blood unit; expiry is calculated from the component's shelf life (US-07). 400 for invalid input or a future collection time, 409 for a duplicate unit ID | Coordinator |
 | GET | `/api/units/?blood_type=&component=&status=` | View inventory, earliest expiry first; `status=available` excludes expired units (US-07) | Coordinator |

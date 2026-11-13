@@ -7,6 +7,7 @@ from accounts.permissions import IsCoordinator
 
 from . import donor_suggestions, matching, services
 from .serializers import (
+    BloodRequestListParamsSerializer,
     BloodRequestSerializer,
     ConfirmCancelSerializer,
     MatchedUnitSerializer,
@@ -20,7 +21,9 @@ class BloodRequestListCreateView(APIView):
     permission_classes = [IsAuthenticated, IsCoordinator]
 
     def get(self, request):
-        records = services.list_blood_requests()
+        params = BloodRequestListParamsSerializer(data=request.query_params)
+        params.is_valid(raise_exception=True)
+        records = services.list_blood_requests(status=params.validated_data.get("status"))
         return Response(BloodRequestSerializer(records, many=True).data)
 
     def post(self, request):
