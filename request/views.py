@@ -5,7 +5,7 @@ from rest_framework.views import APIView
 
 from accounts.permissions import IsCoordinator
 
-from . import matching, services
+from . import donor_suggestions, matching, services
 from .serializers import (
     BloodRequestSerializer,
     ConfirmCancelSerializer,
@@ -75,5 +75,37 @@ class BloodRequestMatchView(APIView):
                 "request_id": request_id,
                 "units": units,
                 "message": "" if units else "No compatible units available",
+            }
+        )
+
+
+class DonorSuggestionsView(APIView):
+    """compatible donors who are eligible today, to contact when stock is short."""
+
+    permission_classes = [IsAuthenticated, IsCoordinator]
+
+    def get(self, request, request_id):
+        blood_request, donation_type, suggestions = donor_suggestions.suggest_donors(request_id)
+        donors = [
+            {
+                "donor_id": donor.pk,
+                "full_name": donor.full_name,
+                "blood_type": donor.blood_type,
+                "is_identical": donor.is_identical,
+                "last_donation_date": donor.last_donation_date,
+                "next_eligible_date": row["next_eligible_date"],
+                "email": donor.user.email,
+                "phone": donor.phone,
+            }
+            for donor, row in suggestions
+        ]
+        return Response(
+            {
+                "request_id": blood_request.pk,
+                "blood_type": blood_request.blood_type,
+                "component": blood_request.component,
+                "donation_type": donation_type,
+                "donors": donors,
+                "message": "" if donors else donor_suggestions.NO_DONORS_MESSAGE,
             }
         )

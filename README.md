@@ -87,6 +87,7 @@ into `develop` or `main`.
 | GET | `/api/units/<unit_id>/` | View one unit, including discard details and `can_discard` (false once discarded) | Coordinator |
 | POST | `/api/units/<unit_id>/discard/` (`reason`, `confirm`) | Discard a unit with reason `expired`, `damaged`, `failed_testing` or `other` (US-17). 400 if the reason is missing, or not `expired` for an expired unit; 409 if already discarded; 409 with `confirm_required` and the request ID if the unit is reserved, until sent again with `confirm: true`. Releases the reservation and sets the request to partially fulfilled (or pending if none left) | Coordinator |
 | GET | `/api/requests/<request_id>/matches/` | Match available, unexpired units for one request. Red blood cells use ABO/Rh rules (US-13); plasma uses reversed ABO and ignores Rh (US-14). An empty match returns `No compatible units available` | Coordinator |
+| GET | `/api/requests/<request_id>/donor-suggestions/` | List active donors whose blood type is compatible under the component's rules and who are eligible today for the matching donation type (red cells: whole blood, plasma: plasma, platelets: platelets). Shows name, blood type, last donation date, email and phone, identical type first. Empty list returns `No eligible donors found.`; 409 for a fulfilled or cancelled request (US-18) | Coordinator |
 | POST | `/api/requests/<request_id>/cancel/` (`confirm: true`) | Cancel a pending or partially fulfilled request and release its reserved units (US-19); expired units remain expired | Coordinator |
 | GET | `/api/requests/<request_id>/history/` | View a request's event history, including cancellation time and coordinator (US-19) | Coordinator |
 
@@ -144,6 +145,8 @@ US-07 tests are in `inventory/tests.py`.
 US-19 tests are in `request/test_cancellation.py`.
 
 US-17 tests are in `inventory/test_discard.py`.
+
+US-18 tests are in `request/test_donor_suggestions.py`.
 
 ## Project layout
 
