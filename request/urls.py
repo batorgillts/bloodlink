@@ -5,6 +5,7 @@ from .views import (
     BloodRequestHistoryView,
     BloodRequestListCreateView,
     BloodRequestMatchView,
+    BloodRequestReserveView,
     DonorSuggestionsView,
 )
 
@@ -24,6 +25,11 @@ urlpatterns = [
         "<int:request_id>/cancel/",
         BloodRequestCancelView.as_view(),
         name="blood-request-cancel",
+    ),
+    path(
+        "<int:request_id>/reserve/",
+        BloodRequestReserveView.as_view(),
+        name="blood-request-reserve",
     ),
     path(
         "<int:request_id>/history/",

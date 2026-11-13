@@ -34,6 +34,17 @@ class ConfirmCancelSerializer(serializers.Serializer):
         return value
 
 
+class ReserveUnitsSerializer(serializers.Serializer):
+    """US-16 input: the units the coordinator picked from the match results."""
+
+    unit_ids = serializers.ListField(child=serializers.IntegerField(min_value=1), allow_empty=False)
+
+    def validate_unit_ids(self, value):
+        if len(value) != len(set(value)):
+            raise serializers.ValidationError("Each unit can be selected only once.")
+        return value
+
+
 class RequestEventSerializer(serializers.ModelSerializer):
     actor_email = serializers.EmailField(source="actor.email", read_only=True)
 
