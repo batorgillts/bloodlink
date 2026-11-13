@@ -5,6 +5,18 @@ from inventory.models import BloodUnit
 
 from .models import BloodRequest, RequestEvent
 
+ALLOWED_REQUEST_STATUSES = ", ".join(BloodRequest.Status.values)
+
+
+class BloodRequestListParamsSerializer(serializers.Serializer):
+    status = serializers.ChoiceField(
+        choices=BloodRequest.Status.choices,
+        required=False,
+        error_messages={
+            "invalid_choice": f"Invalid filter. Allowed: {ALLOWED_REQUEST_STATUSES}"
+        },
+    )
+
 
 class BloodRequestSerializer(serializers.ModelSerializer):
     quantity = serializers.IntegerField(min_value=1)

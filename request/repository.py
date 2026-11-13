@@ -8,8 +8,11 @@ from inventory.models import BloodUnit, CompatibilityRule
 from .models import BloodRequest, RequestEvent, Reservation
 
 
-def list_blood_requests():
-    return BloodRequest.objects.select_related("logged_by").all()
+def list_blood_requests(*, status=None):
+    requests = BloodRequest.objects.select_related("logged_by").all()
+    if status is not None:
+        requests = requests.filter(status=status)
+    return requests
 
 
 def create_blood_request(*, logged_by, blood_type, component, quantity):

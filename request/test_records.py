@@ -1,8 +1,12 @@
+from datetime import timedelta
+
 from django.test import TestCase
+from django.utils import timezone
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from accounts.models import User
+from inventory.models import BloodUnit
 
 from .models import BloodRequest
 
@@ -37,6 +41,16 @@ class BloodRequestApiTests(TestCase):
         }
         values.update(overrides)
         return BloodRequest.objects.create(**values)
+
+    def make_unit(self, blood_type, expires_at):
+        return BloodUnit.objects.create(
+            unit_code=f"US11-MATCH-{BloodUnit.objects.count() + 1}",
+            blood_type=blood_type,
+            component="RBC",
+            collected_at=timezone.now() - timedelta(days=1),
+            expires_at=expires_at,
+            created_by=self.coordinator,
+        )
 
     def test_coordinator_can_log_request_with_pending_status_and_audit_fields(self):
         response = self.client.post(
@@ -102,6 +116,62 @@ class BloodRequestApiTests(TestCase):
             {row["id"] for row in response.data},
             set(BloodRequest.objects.values_list("id", flat=True)),
         )
+
+    def test_list_can_filter_by_status(self):
+        pending_ids = {
+            self.make_request(status=BloodRequest.Status.PENDING).pk,
+            self.make_request(status=BloodRequest.Status.PENDING).pk,
+        }
+        self.make_request(status=BloodRequest.Status.PARTIALLY_FULFILLED)
+        self.make_request(status=BloodRequest.Status.FULFILLED)
+        self.make_request(status=BloodRequest.Status.CANCELLED)
+
+        response = self.client.get(LIST_URL, {"status": BloodRequest.Status.PENDING})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual({row["id"] for row in response.data}, pending_ids)
+        self.assertEqual({row["status"] for row in response.data}, {BloodRequest.Status.PENDING})
+
+    def test_list_rejects_unknown_status_and_lists_allowed_values(self):
+        response = self.client.get(LIST_URL, {"status": "lost"})
+
+        self.assertEqual(response.status_code, 400)
+        error = " ".join(response.data["status"])
+        for allowed in BloodRequest.Status.values:
+            self.assertIn(allowed, error)
+
+    def test_matching_prioritizes_exact_type_and_excludes_expired_units(self):
+        now = timezone.now()
+        blood_request = self.make_request(blood_type="A+", component="RBC")
+        substitute = self.make_unit("O-", now + timedelta(days=1))
+        exact = self.make_unit("A+", now + timedelta(days=2))
+        expired_exact = self.make_unit("A+", now - timedelta(seconds=1))
+
+        response = self.client.get(f"{LIST_URL}{blood_request.pk}/matches/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [row["id"] for row in response.data["units"]],
+            [exact.pk, substitute.pk],
+        )
+        self.assertEqual(
+            [row["is_identical"] for row in response.data["units"]],
+            [True, False],
+        )
+        self.assertNotIn(
+            expired_exact.pk,
+            {row["id"] for row in response.data["units"]},
+        )
+
+    def test_matching_returns_substitutes_when_exact_type_pool_is_empty(self):
+        blood_request = self.make_request(blood_type="A+", component="RBC")
+        substitute = self.make_unit("O-", timezone.now() + timedelta(days=1))
+
+        response = self.client.get(f"{LIST_URL}{blood_request.pk}/matches/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([row["id"] for row in response.data["units"]], [substitute.pk])
+        self.assertFalse(response.data["units"][0]["is_identical"])
 
     def test_donor_cannot_log_or_list_requests(self):
         self.authenticate(self.donor)
