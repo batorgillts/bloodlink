@@ -1,7 +1,8 @@
 """Database access for requests, reservations, history and compatible inventory."""
 
-from django.db.models import OuterRef, Subquery
+from django.db.models import Max, OuterRef, Q, Subquery
 
+from donors.models import DonationIntervalRule, Donor
 from inventory.models import BloodUnit, CompatibilityRule
 
 from .models import BloodRequest, RequestEvent, Reservation
@@ -92,4 +93,42 @@ def compatible_units(blood_request):
             )
         )
         .order_by("-is_identical", "expires_at", "unit_code")
+    )
+
+
+def interval_days(donation_type):
+    return (
+        DonationIntervalRule.objects.filter(donation_type=donation_type)
+        .values_list("min_interval_days", flat=True)
+        .first()
+    )
+
+
+def compatible_donors(blood_request, donation_type):
+    """US-18: active donors whose blood type the component's rules allow for this request.
+
+    Each donor carries their latest donation of `donation_type` (for eligibility) and their
+    latest donation of any type (shown to the coordinator).
+    """
+    rules = CompatibilityRule.objects.filter(
+        component=blood_request.component,
+        request_blood_type=blood_request.blood_type,
+    )
+    return (
+        Donor.objects.filter(
+            status=Donor.Status.ACTIVE,
+            blood_type__in=rules.values("unit_blood_type"),
+        )
+        .select_related("user")
+        .annotate(
+            last_of_type=Max(
+                "donations__donation_date",
+                filter=Q(donations__donation_type_id=donation_type),
+            ),
+            last_donation_date=Max("donations__donation_date"),
+            is_identical=Subquery(
+                rules.filter(unit_blood_type=OuterRef("blood_type")).values("is_identical")[:1]
+            ),
+        )
+        .order_by("-is_identical", "full_name", "id")
     )

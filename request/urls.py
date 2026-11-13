@@ -5,9 +5,15 @@ from .views import (
     BloodRequestHistoryView,
     BloodRequestListCreateView,
     BloodRequestMatchView,
+    DonorSuggestionsView,
 )
 
 urlpatterns = [
+    path(
+        "<int:request_id>/donor-suggestions/",
+        DonorSuggestionsView.as_view(),
+        name="blood-request-donor-suggestions",
+    ),
     path(
         "<int:request_id>/matches/",
         BloodRequestMatchView.as_view(),
