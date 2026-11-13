@@ -33,6 +33,7 @@ class ConfirmCancelSerializer(serializers.Serializer):
             raise serializers.ValidationError("Cancellation must be confirmed.")
         return value
 
+
 class ReserveUnitsSerializer(serializers.Serializer):
     """US-16 input: the units the coordinator picked from the match results."""
 
@@ -42,6 +43,7 @@ class ReserveUnitsSerializer(serializers.Serializer):
         if len(value) != len(set(value)):
             raise serializers.ValidationError("Each unit can be selected only once.")
         return value
+
 
 class RequestEventSerializer(serializers.ModelSerializer):
     actor_email = serializers.EmailField(source="actor.email", read_only=True)

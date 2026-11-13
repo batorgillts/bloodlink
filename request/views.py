@@ -111,6 +111,7 @@ class DonorSuggestionsView(APIView):
             }
         )
 
+
 class BloodRequestReserveView(APIView):
     """US-16: reserve selected compatible units for a request."""
 

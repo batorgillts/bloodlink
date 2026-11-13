@@ -25,7 +25,7 @@ urlpatterns = [
         "<int:request_id>/cancel/",
         BloodRequestCancelView.as_view(),
         name="blood-request-cancel",
-    ),    
+    ),
     path(
         "<int:request_id>/reserve/",
         BloodRequestReserveView.as_view(),

@@ -106,7 +106,6 @@ def release_reservation_for_discard(unit, coordinator, released_at, locked_reque
         actor=coordinator,
     )
 
-
     previous_status = locked_request.status
     remaining = repository.count_active_reservations(locked_request.pk)
     new_status = (
@@ -130,7 +129,6 @@ def get_request_history(request_id):
     if not repository.find_request(request_id):
         raise NotFound("Blood request not found.")
     return repository.request_events(request_id)
-
 
 
 @transaction.atomic
