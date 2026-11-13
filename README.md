@@ -70,7 +70,7 @@ into `develop` or `main`.
 |---|---|---|---|
 | GET | `/api/health/` | Check the server is up | Anyone |
 | POST | `/api/auth/register/` (`full_name`, `email`, `password`, `date_of_birth`, `blood_type`, `phone`) | Register as a donor and sign in; returns `access` and `refresh` tokens (US-01). 400 for invalid input, 409 if the email is taken | Anyone |
-| POST | `/api/auth/token/` (`email`, `password`) | Sign in, returns `access` and `refresh` tokens | Anyone |
+| POST | `/api/auth/token/` (`email`, `password`) | Sign in (US-02, US-06). Email is case-insensitive. Returns `access`, `refresh`, `email` and `role`. 400 if a field is missing, 401 for wrong credentials or a deactivated account | Anyone |
 | POST | `/api/auth/token/refresh/` (`refresh`) | Get a new access token | Anyone |
 | GET / PATCH | `/api/donors/me/contact/` (`email` and/or `phone` for PATCH) | View or update own contact information (US-03) | Signed-in active donor |
 | GET / PATCH | `/api/donors/<donor_id>/contact/` | Same operation by donor profile ID; any other ID returns 403 | Owning active donor only |
