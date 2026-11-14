@@ -64,6 +64,15 @@ class SignInRoleTests(TestCase):
     def test_email_is_case_insensitive_at_sign_in(self):
         self.assertEqual(self.sign_in("  DONOR@BloodLink.test ").status_code, 200)
 
+    def test_email_changed_outside_sign_up_is_saved_lowercase(self):
+        # Like an admin editing the email in the admin panel.
+        user = User.objects.get(email="donor@bloodlink.test")
+        user.email = "A@Example.com"
+        user.save()
+        user.refresh_from_db()
+        self.assertEqual(user.email, "a@example.com")
+        self.assertEqual(self.sign_in("A@example.com").status_code, 200)
+
     def test_missing_password_returns_400(self):
         res = self.client.post("/api/auth/token/", {"email": "donor@bloodlink.test"})
         self.assertEqual(res.status_code, 400)
