@@ -14,11 +14,22 @@ from .serializers import (
     ContactUpdateSerializer,
     DeleteConfirmationSerializer,
     DonationCreateSerializer,
+    DonorProfileSerializer,
     DonorRecordSerializer,
     DonorRecordUpdateSerializer,
     DonorSearchParamsSerializer,
     WithdrawConfirmationSerializer,
 )
+
+
+class DonorProfileView(APIView):
+    """Read the current donor's profile; IDs supplied by clients cannot select another donor."""
+
+    permission_classes = [IsAuthenticated, IsDonor]
+
+    def get(self, request):
+        donor = services.get_own_contact(request.user.pk)
+        return Response(DonorProfileSerializer(donor).data)
 
 
 class DonorContactView(APIView):

@@ -11,3 +11,5 @@ htmlcov/
 .vscode/
 .DS_Store
 node_modules/
+bloodlink-demo.sqlite3
+.demo/

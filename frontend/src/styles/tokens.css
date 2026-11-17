@@ -12,7 +12,7 @@
     --color-muted: #4a5563; /* secondary text, 7.6:1 on white */
     --color-border: #c9ced6;
     --color-surface: #ffffff;
-    --color-page: #fbf7f8;
+    --color-page: #f6f7f8;
   
     /* Status colors. Never use these alone: always pair with a word and an icon,
        so color-blind users get the same information (WCAG 1.4.1). */
