@@ -68,7 +68,8 @@ class ReserveUnitsApiTests(TestCase):
         self.assertEqual(res.status_code, 201)
         self.assertEqual(res.data["status"], "fulfilled")
         self.assertEqual(res.data["remaining_quantity"], 0)
-        self.assertEqual(set(res.data["reserved_units"]), {"U-A", "U-B"})
+        codes = {unit["unit_code"] for unit in res.data["reserved_units"]}
+        self.assertEqual(codes, {"U-A", "U-B"})
         for unit in (self.unit_a, self.unit_b):
             unit.refresh_from_db()
             self.assertEqual(unit.status, BloodUnit.Status.RESERVED)
@@ -154,6 +155,34 @@ class ReserveUnitsApiTests(TestCase):
         self.assertEqual(events.filter(event_type="reserved").count(), 2)
         change = events.get(event_type="status_changed")
         self.assertEqual((change.from_status, change.to_status), ("pending", "fulfilled"))
+
+    def test_opening_the_request_lists_its_reserved_units(self):
+        self.reserve([self.unit_a.pk])
+        res = self.client.get(f"/api/requests/{self.request.pk}/")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data["status"], "partially_fulfilled")
+        self.assertEqual(len(res.data["reserved_units"]), 1)
+        unit = res.data["reserved_units"][0]
+        self.assertEqual((unit["unit_id"], unit["unit_code"]), (self.unit_a.pk, "U-A"))
+        self.assertEqual(unit["blood_type"], "A+")
+
+    def test_request_list_shows_reserved_units_per_request(self):
+        other = make_request(self.coordinator, quantity=1)
+        self.reserve([self.unit_a.pk])
+        self.reserve([self.unit_b.pk], request_id=other.pk)
+        rows = {row["id"]: row for row in self.client.get("/api/requests/").data}
+        self.assertEqual([u["unit_code"] for u in rows[self.request.pk]["reserved_units"]], ["U-A"])
+        self.assertEqual([u["unit_code"] for u in rows[other.pk]["reserved_units"]], ["U-B"])
+
+    def test_cancelled_request_no_longer_lists_released_units(self):
+        self.reserve([self.unit_a.pk])
+        cancel_url = f"/api/requests/{self.request.pk}/cancel/"
+        self.client.post(cancel_url, {"confirm": True}, format="json")
+        res = self.client.get(f"/api/requests/{self.request.pk}/")
+        self.assertEqual(res.data["reserved_units"], [])
+
+    def test_unknown_request_detail_returns_404(self):
+        self.assertEqual(self.client.get("/api/requests/999999/").status_code, 404)
 
     def test_ac5_donor_gets_403(self):
         self.authenticate(self.donor)
