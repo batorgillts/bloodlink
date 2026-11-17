@@ -73,6 +73,13 @@ class SignInRoleTests(TestCase):
         self.assertEqual(user.email, "a@example.com")
         self.assertEqual(self.sign_in("A@example.com").status_code, 200)
 
+    def test_unregistered_email_returns_401(self):
+        res = self.sign_in("nobody@bloodlink.test")
+        self.assertEqual(res.status_code, 401)
+        # Same message as a wrong password, so nobody can probe which emails have accounts.
+        wrong_password = self.sign_in("donor@bloodlink.test", password="wrong")
+        self.assertEqual(res.data["detail"], wrong_password.data["detail"])
+
     def test_missing_password_returns_400(self):
         res = self.client.post("/api/auth/token/", {"email": "donor@bloodlink.test"})
         self.assertEqual(res.status_code, 400)
