@@ -15,6 +15,14 @@ def list_blood_requests(*, status=None):
     return repository.list_blood_requests(status=status)
 
 
+def get_blood_request(request_id):
+    """US-16: one request with the units currently reserved for it."""
+    blood_request = repository.find_request_with_reserved_units(request_id)
+    if blood_request is None:
+        raise NotFound("Blood request not found.")
+    return blood_request
+
+
 @transaction.atomic
 def log_blood_request(data, coordinator):
     # Status and logging metadata are assigned by the server, not the client.
@@ -206,4 +214,8 @@ def reserve_units(request_id, unit_ids, coordinator):
             created_at=now,
             actor=coordinator,
         )
-    return blood_request, units, blood_request.quantity - reserved_total
+    # Reload with its reserved units, so the response lists every unit held, not only these.
+    return (
+        repository.find_request_with_reserved_units(blood_request.pk),
+        blood_request.quantity - reserved_total,
+    )

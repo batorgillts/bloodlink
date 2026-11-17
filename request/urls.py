@@ -2,6 +2,7 @@ from django.urls import path
 
 from .views import (
     BloodRequestCancelView,
+    BloodRequestDetailView,
     BloodRequestHistoryView,
     BloodRequestListCreateView,
     BloodRequestMatchView,
@@ -26,6 +27,7 @@ urlpatterns = [
         BloodRequestCancelView.as_view(),
         name="blood-request-cancel",
     ),
+    path("<int:request_id>/", BloodRequestDetailView.as_view(), name="blood-request-detail"),
     path(
         "<int:request_id>/reserve/",
         BloodRequestReserveView.as_view(),

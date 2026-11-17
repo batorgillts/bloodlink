@@ -37,6 +37,16 @@ class BloodRequestListCreateView(APIView):
         )
 
 
+class BloodRequestDetailView(APIView):
+    """US-16: open one request and see the units reserved for it."""
+
+    permission_classes = [IsAuthenticated, IsCoordinator]
+
+    def get(self, request, request_id):
+        blood_request = services.get_blood_request(request_id)
+        return Response(BloodRequestSerializer(blood_request).data)
+
+
 class BloodRequestCancelView(APIView):
     """US-19: confirm cancellation, release reserved units, and log the change."""
 
@@ -123,14 +133,10 @@ class BloodRequestReserveView(APIView):
     def post(self, request, request_id):
         data = ReserveUnitsSerializer(data=request.data)
         data.is_valid(raise_exception=True)
-        blood_request, units, remaining = services.reserve_units(
+        blood_request, remaining = services.reserve_units(
             request_id, data.validated_data["unit_ids"], request.user
         )
         return Response(
-            {
-                **BloodRequestSerializer(blood_request).data,
-                "reserved_units": [unit.unit_code for unit in units],
-                "remaining_quantity": remaining,
-            },
+            {**BloodRequestSerializer(blood_request).data, "remaining_quantity": remaining},
             status=status.HTTP_201_CREATED,
         )

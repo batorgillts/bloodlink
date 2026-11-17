@@ -1,6 +1,6 @@
 """Database access for requests, reservations, history and compatible inventory."""
 
-from django.db.models import Max, OuterRef, Q, Subquery
+from django.db.models import Max, OuterRef, Prefetch, Q, Subquery
 
 from donors.models import DonationIntervalRule, Donor
 from inventory.models import BloodUnit, CompatibilityRule
@@ -8,11 +8,23 @@ from inventory.models import BloodUnit, CompatibilityRule
 from .models import BloodRequest, RequestEvent, Reservation
 
 
+def with_reserved_units(requests):
+    """US-16: load each request's active reservations and their units in one extra query."""
+    active = Reservation.objects.filter(released_at__isnull=True).select_related("unit")
+    return requests.prefetch_related(
+        Prefetch("reservations", queryset=active, to_attr="active_reservations")
+    )
+
+
 def list_blood_requests(*, status=None):
     requests = BloodRequest.objects.select_related("logged_by").all()
     if status is not None:
         requests = requests.filter(status__in=status)
-    return requests
+    return with_reserved_units(requests)
+
+
+def find_request_with_reserved_units(request_id):
+    return with_reserved_units(BloodRequest.objects.filter(pk=request_id)).first()
 
 
 def create_blood_request(*, logged_by, blood_type, component, quantity):

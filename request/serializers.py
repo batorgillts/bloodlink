@@ -3,7 +3,7 @@ from rest_framework import serializers
 from config.choices import Component
 from inventory.models import BloodUnit
 
-from .models import BloodRequest, RequestEvent
+from .models import BloodRequest, RequestEvent, Reservation
 
 ALLOWED_REQUEST_STATUSES = ", ".join(BloodRequest.Status.values)
 
@@ -20,9 +20,25 @@ class BloodRequestListParamsSerializer(serializers.Serializer):
     )
 
 
+class ReservedUnitSerializer(serializers.ModelSerializer):
+    """US-16: a unit currently held for a request."""
+
+    unit_id = serializers.IntegerField(source="unit.id")
+    unit_code = serializers.CharField(source="unit.unit_code")
+    blood_type = serializers.CharField(source="unit.blood_type")
+    component = serializers.CharField(source="unit.component")
+    expires_at = serializers.DateTimeField(source="unit.expires_at")
+
+    class Meta:
+        model = Reservation
+        fields = ["unit_id", "unit_code", "blood_type", "component", "expires_at", "reserved_at"]
+        read_only_fields = fields
+
+
 class BloodRequestSerializer(serializers.ModelSerializer):
     quantity = serializers.IntegerField(min_value=1)
     can_cancel = serializers.BooleanField(read_only=True)
+    reserved_units = serializers.SerializerMethodField()
 
     class Meta:
         model = BloodRequest
@@ -35,8 +51,14 @@ class BloodRequestSerializer(serializers.ModelSerializer):
             "logged_at",
             "logged_by",
             "can_cancel",
+            "reserved_units",
         ]
         read_only_fields = ["id", "status", "logged_at", "logged_by"]
+
+    def get_reserved_units(self, blood_request):
+        # Filled by repository.with_reserved_units(); a new request has no reservations yet.
+        reservations = getattr(blood_request, "active_reservations", [])
+        return ReservedUnitSerializer(reservations, many=True).data
 
 
 class ConfirmCancelSerializer(serializers.Serializer):
