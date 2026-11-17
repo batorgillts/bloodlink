@@ -82,6 +82,7 @@ into `develop` or `main`.
 | POST | `/api/donors/<donor_id>/donations/` (`donation_type`, `donation_date`, `blood_type`, `volume_ml`) | Record a donation entry (US-09); returns the entry with recalculated history and eligibility. 400 if invalid or not yet eligible, 409 if the donor is not active | Coordinator |
 | GET | `/api/requests/?status=<value>` | List all blood requests by default; repeat `status` to filter by multiple values, such as `?status=pending&status=fulfilled`. Status values are case-sensitive and must be lowercase: `pending`, `partially_fulfilled`, `fulfilled`, `cancelled`; invalid values return 400 (US-11) | Coordinator |
 | POST | `/api/requests/` (`blood_type`, `component`, `quantity`) | Log a new blood request with `pending` status, coordinator and timestamp (US-11) | Coordinator |
+| GET | `/api/requests/<request_id>/` | Open one request with `reserved_units`: the units currently held for it (unit id, code, blood type, component, expiry, reserved time). 404 if not found (US-16) | Coordinator |
 | POST | `/api/units/` (`unit_code`, `blood_type`, `component`, `collected_at`) | Record a blood unit; expiry is calculated from the component's shelf life (US-07). 400 for invalid input or a future collection time, 409 for a duplicate unit ID | Coordinator |
 | GET | `/api/units/?blood_type=&component=&status=` | View inventory, earliest expiry first; `status=available` excludes expired units (US-07) | Coordinator |
 | GET | `/api/units/<unit_id>/` | View one unit, including discard details and `can_discard` (false once discarded) | Coordinator |
@@ -90,6 +91,7 @@ into `develop` or `main`.
 | GET | `/api/requests/<request_id>/donor-suggestions/` | List active donors whose blood type is compatible under the component's rules and who are eligible today for the matching donation type (red cells: whole blood, plasma: plasma, platelets: platelets). Shows name, blood type, last donation date, email and phone, identical type first. Empty list returns `No eligible donors found.`; 409 for a fulfilled or cancelled request (US-18) | Coordinator |
 | POST | `/api/requests/<request_id>/cancel/` (`confirm: true`) | Cancel a pending or partially fulfilled request and release its reserved units (US-19); expired units remain expired | Coordinator |
 | GET | `/api/requests/<request_id>/history/` | View a request's event history, including cancellation time and coordinator (US-19) | Coordinator |
+| POST | `/api/requests/<id>/reserve/` (`unit_ids`) | Reserve selected compatible units in one transaction; request becomes `partially_fulfilled` or `fulfilled` (US-16). 400 if too many or incompatible units, 409 if a unit is no longer available or the request is closed, 404 if not found | Coordinator |
 
 Protected endpoints require `Authorization: Bearer <access token>`.
 Without it they return 401. A signed-in donor calling a coordinator-only endpoint gets 403.

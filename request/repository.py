@@ -1,6 +1,6 @@
 """Database access for requests, reservations, history and compatible inventory."""
 
-from django.db.models import Max, OuterRef, Q, Subquery
+from django.db.models import Max, OuterRef, Prefetch, Q, Subquery
 
 from donors.models import DonationIntervalRule, Donor
 from inventory.models import BloodUnit, CompatibilityRule
@@ -8,11 +8,23 @@ from inventory.models import BloodUnit, CompatibilityRule
 from .models import BloodRequest, RequestEvent, Reservation
 
 
+def with_reserved_units(requests):
+    """US-16: load each request's active reservations and their units in one extra query."""
+    active = Reservation.objects.filter(released_at__isnull=True).select_related("unit")
+    return requests.prefetch_related(
+        Prefetch("reservations", queryset=active, to_attr="active_reservations")
+    )
+
+
 def list_blood_requests(*, status=None):
     requests = BloodRequest.objects.select_related("logged_by").all()
     if status is not None:
         requests = requests.filter(status__in=status)
-    return requests
+    return with_reserved_units(requests)
+
+
+def find_request_with_reserved_units(request_id):
+    return with_reserved_units(BloodRequest.objects.filter(pk=request_id)).first()
 
 
 def create_blood_request(*, logged_by, blood_type, component, quantity):
@@ -135,3 +147,21 @@ def compatible_donors(blood_request, donation_type):
         )
         .order_by("-is_identical", "full_name", "id")
     )
+
+
+def units_for_update(unit_ids):
+    """Lock the selected units in id order, so two reservations never deadlock."""
+    return list(BloodUnit.objects.select_for_update().filter(pk__in=unit_ids).order_by("pk"))
+
+
+def compatible_unit_types(blood_request):
+    return set(
+        CompatibilityRule.objects.filter(
+            component=blood_request.component,
+            request_blood_type=blood_request.blood_type,
+        ).values_list("unit_blood_type", flat=True)
+    )
+
+
+def create_reservation(*, request, unit, reserved_by):
+    return Reservation.objects.create(request=request, unit=unit, reserved_by=reserved_by)

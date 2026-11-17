@@ -12,6 +12,7 @@ from .serializers import (
     ConfirmCancelSerializer,
     MatchedUnitSerializer,
     RequestEventSerializer,
+    ReserveUnitsSerializer,
 )
 
 
@@ -34,6 +35,16 @@ class BloodRequestListCreateView(APIView):
             BloodRequestSerializer(record).data,
             status=status.HTTP_201_CREATED,
         )
+
+
+class BloodRequestDetailView(APIView):
+    """US-16: open one request and see the units reserved for it."""
+
+    permission_classes = [IsAuthenticated, IsCoordinator]
+
+    def get(self, request, request_id):
+        blood_request = services.get_blood_request(request_id)
+        return Response(BloodRequestSerializer(blood_request).data)
 
 
 class BloodRequestCancelView(APIView):
@@ -111,4 +122,21 @@ class DonorSuggestionsView(APIView):
                 "donors": donors,
                 "message": "" if donors else donor_suggestions.NO_DONORS_MESSAGE,
             }
+        )
+
+
+class BloodRequestReserveView(APIView):
+    """US-16: reserve selected compatible units for a request."""
+
+    permission_classes = [IsAuthenticated, IsCoordinator]
+
+    def post(self, request, request_id):
+        data = ReserveUnitsSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        blood_request, remaining = services.reserve_units(
+            request_id, data.validated_data["unit_ids"], request.user
+        )
+        return Response(
+            {**BloodRequestSerializer(blood_request).data, "remaining_quantity": remaining},
+            status=status.HTTP_201_CREATED,
         )
