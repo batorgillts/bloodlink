@@ -4,6 +4,7 @@ from .views import (
     DonationCreateView,
     DonationDeleteView,
     DonorContactView,
+    DonorProfileView,
     DonorRecordDetailView,
     DonorRecordListCreateView,
     EligibilityView,
@@ -11,6 +12,7 @@ from .views import (
 )
 
 urlpatterns = [
+    path("me/profile/", DonorProfileView.as_view(), name="my-profile"),
     path("", DonorRecordListCreateView.as_view(), name="donor-record-list-create"),
     path("<int:donor_id>/", DonorRecordDetailView.as_view(), name="donor-record-detail"),
     path(

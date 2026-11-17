@@ -27,6 +27,14 @@ class ContactSerializer(serializers.Serializer):
     phone = serializers.CharField(read_only=True)
 
 
+class DonorProfileSerializer(ContactSerializer):
+    """Read-only fields for the signed-in donor's own portal."""
+
+    full_name = serializers.CharField(read_only=True)
+    blood_type = serializers.CharField(read_only=True)
+    status = serializers.CharField(read_only=True)
+
+
 class ContactUpdateSerializer(serializers.Serializer):
     email = serializers.EmailField(max_length=254, required=False)
     phone = serializers.RegexField(

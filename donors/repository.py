@@ -70,7 +70,11 @@ def interval_rules():
 
 
 def donations_for(donor_id):
-    return list(Donation.objects.filter(donor_id=donor_id).order_by("-donation_date", "-id"))
+    return list(
+        Donation.objects.filter(donor_id=donor_id)
+        .select_related("recorded_by")
+        .order_by("-donation_date", "-id")
+    )
 
 
 def active_donors():

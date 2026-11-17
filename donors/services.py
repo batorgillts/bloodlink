@@ -147,6 +147,10 @@ def _eligibility_payload(donor, today):
 def _donation_row(donation):
     return {
         "donation_id": donation.pk,
+        "recorded_by": (
+            donation.recorded_by.get_full_name().strip()
+            or f"Coordinator #{donation.recorded_by_id}"
+        ),
         "donation_type": donation.donation_type_id,
         "donation_date": donation.donation_date.isoformat(),
         "blood_type": donation.blood_type,
