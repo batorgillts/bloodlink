@@ -11,8 +11,8 @@ from . import repository
 from .models import BloodRequest, RequestEvent, Reservation
 
 
-def list_blood_requests():
-    return repository.list_blood_requests()
+def list_blood_requests(*, status=None):
+    return repository.list_blood_requests(status=status)
 
 
 @transaction.atomic
