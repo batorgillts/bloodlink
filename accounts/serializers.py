@@ -4,6 +4,7 @@ from datetime import date
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 from config.choices import BloodType
 
@@ -51,3 +52,15 @@ class DonorRegistrationSerializer(serializers.Serializer):
         if not re.fullmatch(r"[0-9]{10}", value):
             raise serializers.ValidationError("Phone number must be exactly 10 digits.")
         return value
+
+
+class SignInSerializer(TokenObtainPairSerializer):
+    """US-02, US-06: sign in with email and password; also returns the account's role."""
+
+    def validate(self, attrs):
+        # Emails are stored in lower case (US-01), so match them the same way here.
+        attrs[self.username_field] = attrs[self.username_field].strip().lower()
+        data = super().validate(attrs)
+        data["email"] = self.user.email
+        data["role"] = self.user.role
+        return data
