@@ -178,10 +178,9 @@ US-10-coordinator deletion:
   return recalculated eligibility and history.
 - `DELETE /api/donors/<donor_id>/`: mark a donor deleted and disable sign-in,
   retaining linked donation history.
-- Both require a coordinator token and JSON `{"confirm": true}`. See
-  [US-10 API, tests and demo](docs/US-10.md) for errors and integration requirements.
-- US-08 search uses active donor filters and is tested with deletion. The React
-  demo includes donor search, record edits, and deletion.
+- Both require a coordinator token and JSON `{"confirm": true}`. 
+- US-08 search uses active donor filters and is tested with deletion. Matching
+  and React UI still need integration before the full story is Done.
 
 
 US-08 donor search, walk-in registration, profile updates, and coordinator-only
