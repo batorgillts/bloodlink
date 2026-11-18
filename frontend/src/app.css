@@ -113,6 +113,7 @@ small {
   font-size: var(--text-sm);
   font-weight: 700;
 }
+.donor-search > input,
 .field input,
 .field select {
   width: 100%;
@@ -123,6 +124,7 @@ small {
   color: var(--color-ink);
   min-width: 0;
 }
+.donor-search > input:focus,
 .field input:focus,
 .field select:focus {
   border-color: var(--color-primary);
@@ -338,6 +340,43 @@ tbody tr:hover {
   flex: 1;
   min-width: 150px;
 }
+.inventory-filters {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+.inventory-filter-row {
+  display: flex;
+  gap: 1rem;
+  align-items: end;
+  flex-wrap: wrap;
+}
+.donor-search { margin: 1.2rem 0; min-width: 0; }
+.donor-search > label { margin-bottom: 0.4rem; }
+.donor-search > input { width: 100%; }
+.donor-search .field-hint { margin: 0.4rem 0 0; }
+.donor-search-results {
+  margin-top: 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.donor-search-results > p, .donor-search-results > button { margin: 0.75rem; }
+.donor-search-results ul { margin: 0; padding: 0; list-style: none; max-height: 240px; overflow-y: auto; }
+.donor-search-results li {
+  position: relative;
+  padding: 0.75rem 3.5rem 0.75rem 0.75rem;
+  cursor: pointer;
+  border-bottom: 1px solid var(--color-border);
+  overflow-wrap: anywhere;
+}
+.donor-search-results li:last-child { border-bottom: 0; }
+.donor-search-results li[aria-selected="true"] { background: var(--color-tint); box-shadow: inset 3px 0 var(--color-primary); }
+.donor-search-results li > span { display: block; color: var(--color-muted); font-size: 0.85rem; }
+.donor-search-results .donor-search-blood { position: absolute; right: 0.75rem; top: 0.75rem; font-weight: 700; }
+.donor-search-selection { display: flex; gap: 0.75rem; align-items: center; justify-content: space-between; margin-top: 0.75rem; }
+.donor-search-selection div { min-width: 0; overflow-wrap: anywhere; }
+.donor-search-selection span { display: block; color: var(--color-muted); font-size: 0.85rem; }
+.donor-search-selection button { flex-shrink: 0; }
 .tabs {
   display: flex;
   gap: 0.3rem;

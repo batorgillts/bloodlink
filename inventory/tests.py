@@ -6,6 +6,7 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from accounts.models import User
+from donors.models import Donation, DonationIntervalRule, Donor
 
 from .models import BloodUnit
 
@@ -39,10 +40,22 @@ class RecordBloodUnitTests(TestCase):
         self.donor = User.objects.create_user("donor@bloodlink.test", "Password123")
         self.client.force_authenticate(self.coordinator)
         self.collected = timezone.now() - timedelta(hours=2)
+        self.profile = Donor.objects.create(
+            user=self.donor, full_name="Unit Source", date_of_birth="1990-01-01",
+            blood_type="A+", phone="2125550100",
+        )
+        self.source = Donation.objects.create(
+            donor=self.profile,
+            donation_type=DonationIntervalRule.objects.get(donation_type="whole_blood"),
+            donation_date=timezone.localdate(self.collected), blood_type="A+",
+            volume_ml=450, recorded_by=self.coordinator,
+        )
 
     def payload(self, **overrides):
         data = {
             "unit_code": "bl-0001",
+            "donor_id": self.profile.pk,
+            "donation_id": self.source.pk,
             "blood_type": "A+",
             "component": "RBC",
             "collected_at": self.collected.isoformat(),
@@ -66,6 +79,8 @@ class RecordBloodUnitTests(TestCase):
     def test_ac1_oct_1_10am_expires_nov_12_10am(self):
         # AC1 example: the Nov 1 clock change must not shift the expiry time.
         collected = datetime(2026, 10, 1, 10, 0, tzinfo=timezone.get_current_timezone())
+        self.source.donation_date = timezone.localdate(collected)
+        self.source.save()
         self.client.post(URL, self.payload(collected_at=collected.isoformat()), format="json")
         expires = timezone.localtime(BloodUnit.objects.get().expires_at)
         self.assertEqual(

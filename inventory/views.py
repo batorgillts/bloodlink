@@ -9,11 +9,17 @@ from rest_framework.views import APIView
 
 from accounts.permissions import IsCoordinator
 from config.exceptions import Conflict
+from config.search import filter_text
 
 from . import services
 from .choices import BloodType, Component
 from .models import BloodUnit
-from .serializers import BloodUnitSerializer, DiscardUnitSerializer
+from .serializers import (
+    BloodUnitSerializer,
+    BloodUnitUpdateSerializer,
+    DiscardUnitSerializer,
+    InventorySearchParamsSerializer,
+)
 
 FILTERS = {
     "blood_type": BloodType.values,
@@ -29,7 +35,12 @@ class BloodUnitListCreate(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated, IsCoordinator]
 
     def get_queryset(self):
-        queryset = BloodUnit.objects.all()
+        queryset = BloodUnit.objects.select_related("donation__donor__user")
+        params = InventorySearchParamsSerializer(data=self.request.query_params)
+        params.is_valid(raise_exception=True)
+        queryset = filter_text(queryset, params.validated_data.get("search"), [
+            "unit_code", "donation__donor__full_name", "donation__donor__user__email",
+        ])
         for field, allowed in FILTERS.items():
             value = self.request.query_params.get(field)
             if value is None:
@@ -57,7 +68,7 @@ class BloodUnitListCreate(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         try:
-            serializer.save(created_by=self.request.user)
+            serializer.save()
         except IntegrityError as exc:
             # Two coordinators submitting the same unit ID at the same moment.
             raise Conflict("A unit with this ID already exists.") from exc
@@ -66,10 +77,16 @@ class BloodUnitListCreate(generics.ListCreateAPIView):
 class BloodUnitDetail(generics.RetrieveAPIView):
     """View one unit; can_discard is false once it is Discarded"""
 
-    queryset = BloodUnit.objects.all()
+    queryset = BloodUnit.objects.select_related("donation__donor__user")
     serializer_class = BloodUnitSerializer
     permission_classes = [IsAuthenticated, IsCoordinator]
     lookup_url_kwarg = "unit_id"
+
+    def patch(self, request, unit_id):
+        data = BloodUnitUpdateSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        unit = services.update_unit(unit_id, data.validated_data, request.user)
+        return Response(BloodUnitSerializer(unit).data)
 
 
 class BloodUnitDiscard(APIView):

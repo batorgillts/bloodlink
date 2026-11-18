@@ -57,13 +57,35 @@ The ordinary development setup remains `python manage.py runserver` on 8000 and 
 ## Suggested 8-minute demonstration
 
 1. Coordinator signs in, opens Donor registry and searches for the synthetic donor. Record a whole-blood donation using today's bank date; show the changed next eligible date. Delete that entry with confirmation and show eligibility restored.
-2. Record two new RBC units, A+ and O-, with unique codes and recent collection times. Create an A+ RBC request for two units.
+2. Record two new RBC units, A+ and O-, with unique codes and recent collection times. Select the corresponding donor and an existing donation, or record a new donation together with the unit. Create an A+ RBC request for two units.
 3. Find matches, reserve one and show Partially fulfilled. Cancel the request and show that the unit is available again.
 4. Create another request and reserve the two units to show Fulfilled. Briefly show plasma/platelet matching using separate requests and matching component inventory.
 5. On an open request, show eligible donor suggestions. In inventory, discard a reserved unit: first choose a reason, then confirm the server's warning about its request. Reopen that request to see its reduced reserved quantity.
 6. Sign out and sign in as the donor; show history/eligibility, update the phone and reload to demonstrate persistence. For withdrawal, register a disposable synthetic donor rather than deactivating the primary demo account.
 
-All destructive UI actions require confirmation. Reserved-unit discard additionally waits for the backend's conflict warning before sending `confirm: true`. Donor deletion/withdrawal retains donation history. Donation recording and blood-unit inventory recording remain separate workflows, as in the backend design.
+All destructive UI actions require confirmation. Reserved-unit discard additionally waits for the backend's conflict warning before sending `confirm: true`. Donor deletion/withdrawal retains donation history. Donations linked to inventory cannot be deleted, including after their units are discarded.
+
+### Donation source tracking
+
+The donor picker searches on the server after a 300 ms typing pause. Enter any part of a first name, last name or email; choose a result with the mouse or Arrow keys and Enter. It returns up to 20 active donors per search and displays names, emails and blood types to distinguish similar names. Editing the selected donor clears the previous donation selection. Requests for older search text are cancelled.
+
+Inventory filters have two rows: **Search inventory** above blood type, component and status. Enter a partial unit code, donor name or email, then press Enter or **Apply filters**. Text matching ignores case and surrounding whitespace. Each space-separated word must match at least one searchable field, so `Lopez Ana` can find `Ana Lopez`. All dropdown filters are applied alongside the text search. Clearing the text and applying filters preserves dropdown selections. Legacy units without a source can still be found by unit code.
+
+API search parameters: `/api/donors/?search=...&limit=20` (optional limit 1–50) and `/api/units/?search=...`. Both accept search text up to 254 characters; existing filters remain supported.
+
+Run `python manage.py migrate` for the normal database, or add `--settings=config.demo_settings` for the isolated demo database. Migration `inventory.0008_bloodunit_donation` preserves existing units with an unknown source; the UI labels these `Source not recorded` rather than inventing donor links. Migration `donors.0004_donationintervalrule_allowed_components` configures the inventory components permitted for each donation type.
+
+Coordinators can record a donation first and then use **Record unit** beside its history entry. The inventory dialog also supports **Record a new donation with this unit**: it saves both records in one transaction and immediately makes the donation visible in the donor's history and eligibility calculation. Choose the actual donation type and total donation volume separately from the processed component. The donation date is the collection date in the bank's America/New_York time zone. Unit blood type and collection date must match the source donation. Additional processed units reuse the original donation and do not add more donations or restart the eligibility interval.
+
+Donors still cannot create donation records themselves. They can refresh Donation history or Overview after a coordinator records their donation. The inventory source column links to the corresponding donor; the coordinator's donation history lists linked unit codes. API requests must supply `donor_id` and either `donation_id` or both `donation_type` and `volume_ml`. Responses include `donation_id` and `source_donation`; legacy units return null for both. This changes the unit-creation contract, while leaving pre-existing inventory readable.
+
+### Correcting units and understanding eligibility
+
+Donation type describes the collection method and selects the configured eligibility interval. Component describes a stored product and selects its shelf life. They are separate persisted fields: whole-blood donations can supply RBC, plasma or platelets; single/double red-cell donations supply RBC units; the plasma and platelet types supply their corresponding component. The UI and API enforce the configured mapping. Donor history now includes the unit codes and components, and inventory displays both component and source donation type.
+
+**Add a unit from an existing donation** creates another unit; it does not edit an existing one. Use the inventory row's **Edit** action to correct its component or collection timestamp with `PATCH /api/units/<id>/`. An optional `donation_type` explicitly corrects the source donation method; selecting a component alone never overwrites that method. Expiry is recalculated. A calendar-date correction updates the source donation date and shifts sibling units by the same calendar-day offset while preserving their local times. The dialog explains this scope. All changes are atomic, and eligibility is checked excluding the record being corrected. Reserved/discarded units are not editable; a shared source cannot change date or type while any linked unit is reserved/discarded. Future collection times and dates before the donor's birth are rejected, including on creation.
+
+Overview and Donation history refresh every ten seconds while visible, and immediately on window focus. Their counts and eligibility come from the same response. New entry forms default to the current date/time. Historical entries only create a waiting period when their recorded date plus the configured interval is still in the future: increasing the donation count alone must not force `Not yet eligible`. Existing synthetic entries dated 1111 are preserved. Incorrect dates on editable units can be corrected through Edit; discarded units remain protected. No cross-type medical eligibility policy has been added.
 
 ## Validation
 

@@ -42,6 +42,12 @@ class BloodUnit(models.Model):
         OTHER = "other", "Other"
 
     unit_code = models.CharField(max_length=32, unique=True)
+    # Nullable only for inventory recorded before source tracking was introduced.
+    # Several processed units may come from the same donation.
+    donation = models.ForeignKey(
+        "donors.Donation", on_delete=models.PROTECT, null=True, blank=True,
+        related_name="blood_units",
+    )
     blood_type = models.CharField(max_length=3, choices=BloodType.choices)
     component = models.CharField(max_length=10, choices=Component.choices)
     collected_at = models.DateTimeField()
@@ -105,6 +111,10 @@ class BloodUnit(models.Model):
         if self.status == self.Status.AVAILABLE and self.expires_at <= timezone.now():
             return self.Status.EXPIRED
         return self.status
+
+    @property
+    def can_edit(self):
+        return self.status in (self.Status.AVAILABLE, self.Status.EXPIRED)
 
     @property
     def can_discard(self):

@@ -45,6 +45,7 @@ class DonationIntervalRule(models.Model):
 
     donation_type = models.CharField(max_length=32, unique=True)
     min_interval_days = models.PositiveIntegerField()
+    allowed_components = models.JSONField(default=list, blank=True)
 
     class Meta:
         ordering = ["id"]

@@ -6,6 +6,19 @@ export function isoToUS(value) {
   return match ? `${match[2]}/${match[3]}/${match[1]}` : value;
 }
 
+export function localDateTimeInput(value = new Date()) {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = n => String(n).padStart(2, "0");
+  return `${pad(d.getMonth() + 1)}/${pad(d.getDate())}/${String(d.getFullYear()).padStart(4, "0")} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+export function bankDateInput() {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York", month: "2-digit", day: "2-digit", year: "numeric",
+  }).format(new Date());
+}
+
 export function localDateTimeToISO(value) {
   const match = /^(\d{2}\/\d{2}\/\d{4}) (\d{2}):(\d{2})$/.exec(value.trim());
   if (!match) return null;

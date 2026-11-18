@@ -1,6 +1,8 @@
+import { RecordBloodUnit } from "./RecordBloodUnit";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { birthDateToISO } from "./registration";
+import { bankDateInput } from "./formValidation";
 import { api } from "./api/client";
 import { Form, Badge, Field, Header, Modal, Notice, ResourceState, Table } from "./ui";
 import { BLOOD, date, useResource } from "./viewHelpers";
@@ -84,9 +86,9 @@ function DonationForm({ donor, onClose, onSaved }) {
     <Notice error>{error}</Notice>
     <Form onSubmit={submit}><fieldset disabled={busy} className="form-grid">
       <Field label="Donation type" name="donation_type" options={donor.eligibility.map(e => [e.donation_type, e.label])} required />
-      <Field label="Donation date" name="donation_date" type="date" required />
+      <Field label="Donation date" name="donation_date" type="date" defaultValue={bankDateInput()} required />
       <Field label="Volume (mL)" name="volume_ml" type="number" min="1" step="1" defaultValue="450" required />
-      <p className="hint">Eligibility is checked when saved. Blood inventory is recorded separately after processing.</p>
+      <p className="hint">Eligibility is checked when saved. After processing, use Record unit beside this donation to link its inventory units.</p>
       <button type="submit">{busy ? "Saving…" : "Save donation"}</button>
     </fieldset></Form>
   </Modal>;
@@ -136,9 +138,14 @@ function Record({ id }) {
       <section className="panel"><div className="panel-title"><h2>Donation history</h2><button className="text-button" onClick={resource.reload}>Refresh record</button></div>
         <Table rows={donor.donations} rowKey={d=>d.donation_id} empty="No previous donations are recorded." columns={[
           ["Date", d=>date(d.donation_date)], ["Type", d=>d.donation_type], ["Blood type", d=>d.blood_type], ["Volume", d=>`${d.volume_ml} mL`],
-          ["Action", d=><button className="danger secondary" onClick={()=>setAction(d)} aria-label={`Delete donation ${d.donation_id}`}>Delete entry</button>],
+          ["Units", d=>d.unit_codes?.join(", ") || "None recorded"],
+          ["Action", d=><div className="actions">
+            {donor.status === "active" && <button className="secondary" onClick={()=>setAction({unitFor:d})} aria-label={`Record unit for donation ${d.donation_id}`}>Record unit</button>}
+            {d.can_delete !== false ? <button className="danger secondary" onClick={()=>setAction(d)} aria-label={`Delete donation ${d.donation_id}`}>Delete entry</button> : <span className="hint">Linked to inventory</span>}
+          </div>],
         ]} />
       </section>
+      {action?.unitFor && <RecordBloodUnit donor={donor} donation={action.unitFor} onClose={()=>setAction(null)} onCreated={()=>saved("Blood unit recorded and linked to this donation.")} />}
       {action === "edit" && <ProfileForm donor={donor} onClose={()=>setAction(null)} onSaved={()=>saved("Donor information saved.")} />}
       {action === "donation" && <DonationForm donor={donor} onClose={()=>setAction(null)} onSaved={()=>saved("Donation recorded. Eligibility has been recalculated.")} />}
       {action === "delete" && <ConfirmAction title="Delete donor record?" method="DELETE" path={`/api/donors/${id}/`} onClose={()=>setAction(null)} onDone={()=>saved("Donor deactivated. Donation history is retained below.")}>This disables sign-in and removes the donor from searches and suggestions. Donation history is retained.</ConfirmAction>}

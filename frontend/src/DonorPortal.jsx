@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "./api/client";
 import { Form, Badge, Header, Notice, ResourceState, Table } from "./ui";
-import { date, title, useResource } from "./viewHelpers";
+import { COMPONENTS, date, title, useResource } from "./viewHelpers";
 import { WithdrawRegistration } from "./InventoryActions";
 import "./donor.css";
 
@@ -27,6 +27,7 @@ function DonationRecords({ records }) {
         ["Entry", d => recordCode(d.donation_id)],
         ["Date", d => date(d.donation_date)],
         ["Donation type", d => title(d.donation_type)],
+        ["Inventory components", d => d.units?.length ? d.units.map(u => `${u.unit_code}: ${COMPONENTS[u.component]}`).join("; ") : "No units recorded"],
         ["Blood type", d => d.blood_type],
         ["Volume", d => `${d.volume_ml} mL`],
         ["Recorded by", d => d.recorded_by || "Blood bank coordinator"],
@@ -36,6 +37,7 @@ function DonationRecords({ records }) {
       {records.map(d => <li key={d.donation_id}>
         <div className="donor-record-heading"><strong>{date(d.donation_date)}</strong><span>{recordCode(d.donation_id)}</span></div>
         <p>{title(d.donation_type)} · {d.blood_type} · {d.volume_ml} mL</p>
+        {!!d.units?.length && <p>Inventory: {d.units.map(u => `${u.unit_code}: ${COMPONENTS[u.component]}`).join("; ")}</p>}
         <span className="muted">Recorded by {d.recorded_by || "Blood bank coordinator"}</span>
       </li>)}
     </ul>
@@ -64,7 +66,7 @@ function Eligibility({ rows }) {
 
 export function DonorOverview() {
   const profile = useResource("/api/donors/me/profile/");
-  const resource = useResource("/api/donors/me/eligibility/");
+  const resource = useResource("/api/donors/me/eligibility/", {refreshInterval: 10000});
   const data = resource.data;
   return <div className="donor-page">
     <Header title="Your donation overview">Review your eligibility and recent donation activity.</Header>
@@ -97,7 +99,7 @@ export function DonorOverview() {
 }
 
 export function DonorHistory() {
-  const resource = useResource("/api/donors/me/eligibility/");
+  const resource = useResource("/api/donors/me/eligibility/", {refreshInterval: 10000});
   const [filter, setFilter] = useState("");
   const data = resource.data;
   const records = data?.donations.filter(d => !filter || d.donation_type === filter) ?? [];
