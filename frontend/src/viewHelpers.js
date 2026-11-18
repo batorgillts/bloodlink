@@ -24,26 +24,42 @@ export const date = (value) =>
 export const time = (value) => (value ? new Date(value).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true }) : "—");
 
 
-export function useResource(path) {
+export function useResource(path, {refreshInterval = 0} = {}) {
   const [state, setState] = useState({ data: null, error: "", key: null });
   const [version, setVersion] = useState(0);
   useEffect(() => {
-    const controller = new AbortController();
-    api(path, { signal: controller.signal })
+    let controller;
+    function fetchLatest() {
+      controller?.abort();
+      controller = new AbortController();
+      const request = controller;
+      api(path, { signal: request.signal })
       .then((data) => {
-        if (!controller.signal.aborted)
+        if (!request.signal.aborted)
           setState({ data, error: "", key: `${path}:${version}` });
       })
       .catch((error) => {
-        if (!controller.signal.aborted)
-          setState({
-            data: null,
+        if (!request.signal.aborted)
+          setState(previous => ({
+            data: previous.key === `${path}:${version}` ? previous.data : null,
             error: error.message,
             key: `${path}:${version}`,
-          });
+          }));
       });
-    return () => controller.abort();
-  }, [path, version]);
+    }
+    fetchLatest();
+    function refreshVisible() { if (document.visibilityState !== "hidden") fetchLatest(); }
+    const timer = refreshInterval ? setInterval(refreshVisible, refreshInterval) : null;
+    if (refreshInterval) {
+      window.addEventListener("focus", refreshVisible);
+      document.addEventListener("visibilitychange", refreshVisible);
+    }
+    return () => {
+      controller?.abort(); clearInterval(timer);
+      window.removeEventListener("focus", refreshVisible);
+      document.removeEventListener("visibilitychange", refreshVisible);
+    };
+  }, [path, version, refreshInterval]);
   const current = state.key === `${path}:${version}`;
   return {
     data: current ? state.data : null,

@@ -112,9 +112,17 @@ class DonorPortalTests(TestCase):
         self.assertEqual(row["recorded_by"], f"Coordinator #{self.coordinator.pk}")
 
     def test_recorder_lookup_does_not_add_queries_per_donation(self):
-        with self.assertNumQueries(1):
+        Donation.objects.create(
+            donor=self.donor, donation_type=self.donation.donation_type,
+            donation_date="2026-01-01", blood_type=self.donor.blood_type,
+            volume_ml=450, recorded_by=self.coordinator,
+        )
+        # One history query plus one batched unit lookup, independent of row count.
+        with self.assertNumQueries(2):
             rows = repository.donations_for(self.donor.pk)
-            self.assertEqual(rows[0].recorded_by.get_full_name(), "Jordan Lee")
+            for row in rows:
+                self.assertEqual(row.recorded_by.get_full_name(), "Jordan Lee")
+                list(row.blood_units.all())
 
     def test_contact_update_is_reflected_in_profile_and_cannot_change_name(self):
         response = self.client.patch(

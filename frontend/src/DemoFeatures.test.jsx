@@ -25,6 +25,25 @@ test("donor registry encodes blood-type filters and never sends blank filters",a
   await waitFor(()=>expect(fetch.mock.calls.at(-1)[0]).toMatch(/\/api\/donors\/\?blood_type=A%2B$/));
 });
 
+test("inventory text search combines with dropdown filters and can be cleared",async()=>{
+  login("/inventory");
+  const fetch=vi.fn(()=>response([])); vi.stubGlobal("fetch",fetch); render(<App/>);
+  await screen.findByText("No units found. Record a blood unit or change your filters.");
+  fireEvent.change(screen.getByLabelText("Search inventory"),{target:{value:" ana+donor@ "}});
+  fireEvent.change(screen.getByLabelText("Blood type"),{target:{value:"A+"}});
+  fireEvent.change(screen.getByLabelText("Component"),{target:{value:"RBC"}});
+  fireEvent.change(screen.getByLabelText("Status"),{target:{value:"available"}});
+  fireEvent.click(screen.getByRole("button",{name:"Apply filters"}));
+  await waitFor(()=>{
+    const params=new URL(fetch.mock.calls.at(-1)[0]).searchParams;
+    expect(Object.fromEntries(params)).toEqual({search:"ana+donor@",blood_type:"A+",component:"RBC",status:"available"});
+  });
+  fireEvent.change(screen.getByLabelText("Search inventory"),{target:{value:""}});
+  fireEvent.click(screen.getByRole("button",{name:"Apply filters"}));
+  await waitFor(()=>expect(new URL(fetch.mock.calls.at(-1)[0]).searchParams.has("search")).toBe(false));
+  expect(new URL(fetch.mock.calls.at(-1)[0]).searchParams.get("component")).toBe("RBC");
+});
+
 test("reserved unit discard requires a second confirmation after the server warning",async()=>{
   login("/inventory");
   let discarded=false;

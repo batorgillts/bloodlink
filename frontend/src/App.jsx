@@ -11,7 +11,7 @@ import {
 } from "react-router-dom";
 import { api, clearSession, readSession, saveSession } from "./api/client";
 import { birthDateToISO } from "./registration";
-import { localDateTimeToISO } from "./formValidation";
+import { EditBloodUnit, RecordBloodUnit } from "./RecordBloodUnit";
 import "./app.css";
 
 import { Form, Notice, Badge, Field, BloodFields, Header, Table, Modal, ResourceState } from "./ui";
@@ -246,86 +246,33 @@ function Shell({ user, onSignOut, children }) {
     </div>
   );
 }
-function CreateRecord({ inventory, onClose, onCreated }) {
+function CreateRecord({ onClose, onCreated }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   async function submit(event) {
     event.preventDefault();
     const body = Object.fromEntries(new FormData(event.currentTarget));
-    if (inventory)
-      body.collected_at = localDateTimeToISO(body.collected_at);
-    else body.quantity = Number(body.quantity);
-    setBusy(true);
-    setError("");
-    try {
-      const result = await api(inventory ? "/api/units/" : "/api/requests/", {
-        method: "POST",
-        body,
-      });
-      onCreated(result);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusy(false);
-    }
+    body.quantity = Number(body.quantity);
+    setBusy(true); setError("");
+    try { onCreated(await api("/api/requests/", {method: "POST", body})); }
+    catch (err) { setError(err.message); }
+    finally { setBusy(false); }
   }
-  return (
-    <Modal
-      title={inventory ? "Record blood unit" : "Log blood request"}
-      onClose={onClose}
-      busy={busy}
-    >
-      <p className="muted">
-        {inventory
-          ? "Expiry is calculated automatically from the component’s shelf life."
-          : "Create a request on behalf of a clinician."}
-      </p>
-      <Notice error>{error}</Notice>
-      <Form onSubmit={submit}>
-        <fieldset disabled={busy} className="form-grid">
-          {inventory && (
-            <Field
-              label="Unique unit code"
-              name="unit_code"
-              required
-              maxLength={32}
-            />
-          )}
-          <div className="two-columns">
-            <BloodFields />
-          </div>
-          {inventory ? (
-            <Field
-              label="Collection date and time (your local time)"
-              name="collected_at"
-              type="datetime-local"
-              required
-            />
-          ) : (
-            <Field
-              label="Quantity (units)"
-              name="quantity"
-              type="number"
-              min="1"
-              step="1"
-              defaultValue="1"
-              required
-            />
-          )}
-          <div className="actions">
-            <button className="secondary" type="button" onClick={onClose}>
-              Cancel
-            </button>
-            <button type="submit">
-              {busy ? "Saving…" : inventory ? "Record unit" : "Create request"}
-            </button>
-          </div>
-        </fieldset>
-      </Form>
-    </Modal>
-  );
+  return <Modal title="Log blood request" onClose={onClose} busy={busy}>
+    <p className="muted">Create a request on behalf of a clinician.</p>
+    <Notice error>{error}</Notice>
+    <Form onSubmit={submit}><fieldset disabled={busy} className="form-grid">
+      <div className="two-columns"><BloodFields /></div>
+      <Field label="Quantity (units)" name="quantity" type="number" min="1" step="1" defaultValue="1" required />
+      <div className="actions">
+        <button className="secondary" type="button" onClick={onClose}>Cancel</button>
+        <button type="submit">{busy ? "Saving…" : "Create request"}</button>
+      </div>
+    </fieldset></Form>
+  </Modal>;
 }
 function Inventory() {
+  const [editing, setEditing] = useState(null);
   const [discarding, setDiscarding] = useState(null);
   const [query, setQuery] = useState("");
   const [creating, setCreating] = useState(false);
@@ -343,15 +290,18 @@ function Inventory() {
       </Header>
       <Notice>{message}</Notice>
       <Form
-        className="filters"
+        className="filters inventory-filters"
         onSubmit={(e) => {
           e.preventDefault();
           const values = [...new FormData(e.currentTarget)].filter(
-            ([, v]) => v,
-          );
+            ([, v]) => v.trim(),
+          ).map(([key, value]) => [key, value.trim()]);
           setQuery(`?${new URLSearchParams(values)}`);
         }}
       >
+        <Field label="Search inventory" name="search" type="search" maxLength={254}
+          placeholder="Unique unit code, donor name or email" />
+        <div className="inventory-filter-row">
         <BloodFields filters />
         <Field
           label="Status"
@@ -367,6 +317,7 @@ function Inventory() {
         <button type="submit" className="secondary">
           Apply filters
         </button>
+        </div>
       </Form>
       <section className="panel">
         <div className="panel-title">
@@ -382,12 +333,19 @@ function Inventory() {
             empty="No units found. Record a blood unit or change your filters."
             columns={[
               ["Unit", (u) => <strong>{u.unit_code}</strong>],
-              ["Action", (u) => u.can_discard ? <button className="danger secondary" onClick={() => setDiscarding(u)}>Discard {u.unit_code}</button> : <span>Discarded: {title(u.discard_reason)}</span>],
+              ["Source donation", (u) => u.source_donation
+                ? <Link to={`/donors/${u.source_donation.donor_id}`}>{u.source_donation.donor_name} · Donation #{u.source_donation.id}</Link>
+                : <span className="muted">Source not recorded</span>],
+              ["Action", (u) => <div className="actions">
+                {u.can_edit && <button className="secondary" onClick={() => setEditing(u)} aria-label={`Edit ${u.unit_code}`}>Edit</button>}
+                {u.can_discard ? <button className="danger secondary" onClick={() => setDiscarding(u)}>Discard {u.unit_code}</button> : <span>Discarded: {title(u.discard_reason)}</span>}
+              </div>],
               [
                 "Blood type",
                 (u) => <span className="blood-type">{u.blood_type}</span>,
               ],
               ["Component", (u) => COMPONENTS[u.component]],
+              ["Donation type", (u) => u.source_donation ? title(u.source_donation.donation_type) : "Source not recorded"],
               ["Collected", (u) => time(u.collected_at)],
               ["Expires", (u) => time(u.expires_at)],
               [
@@ -399,14 +357,16 @@ function Inventory() {
         )}
       </section>
       {discarding && <DiscardUnit unit={discarding} onClose={()=>setDiscarding(null)} onDiscarded={()=>{setDiscarding(null);setMessage("Unit discarded. Any affected request has been updated.");resource.reload();}} />}
+      {editing && <EditBloodUnit unit={editing} onClose={() => setEditing(null)} onSaved={() => {
+        setEditing(null); setMessage("Corrections saved. Source donation, expiry and eligibility have been recalculated."); resource.reload();
+      }} />}
       {creating && (
-        <CreateRecord
-          inventory
+        <RecordBloodUnit
           onClose={() => setCreating(false)}
           onCreated={(unit) => {
             setCreating(false);
             setMessage(
-              `Unit ${unit.unit_code} recorded. Expiry: ${time(unit.expires_at)}. It appears when it matches the current filters.`,
+              `Unit ${unit.unit_code} linked to donation #${unit.donation_id}. Expiry: ${time(unit.expires_at)}. It appears when it matches the current filters.`,
             );
             resource.reload();
           }}

@@ -5,6 +5,7 @@ from contextlib import contextmanager
 from django.db import transaction
 
 from accounts.models import User
+from config.search import filter_text
 
 from .models import Donation, DonationIntervalRule, Donor
 
@@ -54,15 +55,17 @@ def find_donor(donor_id):
     return Donor.objects.select_related("user").filter(pk=donor_id).first()
 
 
-def search_donors(*, name=None, email=None, blood_type=None):
+def search_donors(*, name=None, email=None, blood_type=None, search=None, limit=None):
     queryset = active_donors().select_related("user")
+    queryset = filter_text(queryset, search, ["full_name", "user__email"])
     if name:
         queryset = queryset.filter(full_name__icontains=name)
     if email:
         queryset = queryset.filter(user__email__icontains=email)
     if blood_type:
         queryset = queryset.filter(blood_type=blood_type)
-    return queryset.order_by("full_name", "id")
+    queryset = queryset.order_by("full_name", "id")
+    return queryset[:limit] if limit is not None else queryset
 
 
 def interval_rules():
@@ -73,6 +76,7 @@ def donations_for(donor_id):
     return list(
         Donation.objects.filter(donor_id=donor_id)
         .select_related("recorded_by")
+        .prefetch_related("blood_units")
         .order_by("-donation_date", "-id")
     )
 
@@ -120,9 +124,10 @@ def locked_donor(donor_id):
         yield current
 
 
-def donation_dates(donor_id, donation_type):
+def donation_dates(donor_id, donation_type, exclude_id=None):
     return list(
         Donation.objects.filter(donor_id=donor_id, donation_type_id=donation_type)
+        .exclude(pk=exclude_id)
         .order_by("donation_date")
         .values_list("donation_date", flat=True)
     )

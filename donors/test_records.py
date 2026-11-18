@@ -70,6 +70,30 @@ class DonorRecordApiTests(TestCase):
         response = self.client.get(LIST_URL, {"name": "ana", "blood_type": "O-"})
         self.assertEqual([row["id"] for row in response.data], [self.donor.pk])
 
+    def test_unified_search_matches_partial_first_last_name_and_email(self):
+        for search in ("AN", "LoP", "ana@", " LOPEZ   ana ", "lop example.com"):
+            with self.subTest(search=search):
+                response = self.client.get(LIST_URL, {"search": search, "limit": 20})
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual([row["id"] for row in response.data], [self.donor.pk])
+        self.assertEqual(self.client.get(LIST_URL, {"search": "ana carter"}).data, [])
+
+    def test_search_limit_filters_and_validation(self):
+        response = self.client.get(LIST_URL, {"search": "example", "limit": 1})
+        self.assertEqual([row["id"] for row in response.data], [self.donor.pk])
+        response = self.client.get(LIST_URL, {"search": "example", "blood_type": "A+"})
+        self.assertEqual([row["id"] for row in response.data], [self.other_donor.pk])
+        for params in ({"search": "x" * 255}, {"limit": 0}, {"limit": 51}, {"limit": "many"}):
+            self.assertEqual(self.client.get(LIST_URL, params).status_code, 400)
+        self.assertEqual(len(self.client.get(LIST_URL, {"search": "   "}).data), 2)
+        self.donor.status = Donor.Status.WITHDRAWN
+        self.donor.save()
+        self.assertEqual(self.client.get(LIST_URL, {"search": "ana"}).data, [])
+
+    def test_search_does_not_treat_percent_or_underscore_as_wildcards(self):
+        for search in ("%", "_"):
+            self.assertEqual(self.client.get(LIST_URL, {"search": search}).data, [])
+
     def test_search_returns_only_active_donors(self):
         inactive_records = (
             ("withdrawn@example.com", Donor.Status.WITHDRAWN),
