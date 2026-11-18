@@ -1,0 +1,55 @@
+.donor-identity { display: flex; align-items: center; flex-wrap: wrap; gap: 0.8rem; margin: -0.3rem 0 1.5rem; }
+.donor-identity .blood-type { border-left: 1px solid var(--color-border); padding-left: 0.8rem; }
+.donor-identity .muted { font-size: var(--text-sm); }
+.donor-stats { grid-template-columns: repeat(3, 1fr); }
+.donor-stats .donor-summary-date { font-size: 1.35rem; padding-top: 0.4rem; }
+.donor-page .panel-title a { font-size: var(--text-sm); }
+.donor-panel-note { padding: 1rem 1.5rem; font-size: var(--text-sm); color: var(--color-muted); border-top: 1px solid var(--color-border); }
+.donor-quick-links, .donor-form-actions { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.donor-welcome, .donor-guidance { padding: 1.5rem; border-left: 3px solid var(--color-border); margin: 1.5rem 0; }
+.donor-welcome h2, .donor-guidance h2 { font-size: 1rem; }
+.donor-welcome p, .donor-guidance p { color: var(--color-muted); margin-bottom: 0.7rem; }
+.donor-empty { padding: 2.5rem 1.5rem; text-align: center; }
+.donor-empty h3, .donor-empty h2 { font-size: 1rem; }
+.donor-empty p { color: var(--color-muted); margin-bottom: 0; }
+.donor-empty button { margin-top: 1rem; }
+.donor-record-cards, .donor-eligibility-cards { display: none; list-style: none; padding: 0; margin: 0; }
+.donor-record-cards li, .donor-eligibility-cards li { padding: 1.2rem; border-bottom: 1px solid var(--color-border); }
+.donor-record-cards li:last-child, .donor-eligibility-cards li:last-child { border-bottom: 0; }
+.donor-record-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; }
+.donor-record-heading > span:not(.badge) { font-size: 0.8rem; color: var(--color-muted); }
+.donor-record-cards p, .donor-eligibility-cards p { margin: 0.6rem 0 0.2rem; }
+.donor-record-cards .muted, .donor-eligibility-cards .muted { font-size: var(--text-sm); }
+.donor-history-tools { display: flex; align-items: end; flex-wrap: wrap; gap: 1rem; margin: 0 0 1.5rem; }
+.donor-history-tools > p { flex: 1; margin: 0 0 0.6rem; color: var(--color-muted); }
+.donor-history-tools .field { min-width: 210px; }
+.donor-page .donor-contact-panel { padding: 1.5rem; }
+.donor-page .donor-contact-panel > h2 { padding: 0; }
+.donor-contact-panel .two-columns { align-items: start; }
+.donor-profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1.5rem 0 2rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--color-border); }
+.donor-profile-grid dt { font-size: var(--text-sm); color: var(--color-muted); }
+.donor-profile-grid dd { margin: 0.4rem 0; font-weight: 700; }
+.donor-profile-grid span, .field-hint, .field-error { font-size: var(--text-sm); font-weight: 400; }
+.donor-profile-grid span, .field-hint { color: var(--color-muted); }
+.field-error { color: var(--color-danger); }
+.field input[aria-invalid="true"] { border-color: var(--color-danger); }
+.donor-form-actions { margin-top: 0.5rem; }
+.donor-form-actions .muted { font-size: var(--text-sm); }
+.donor-registration { margin-top: 2.5rem; }
+.donor-registration .panel { background: transparent; }
+.donor-registration h2 { font-size: 1rem; }
+.donor-registration p { color: var(--color-muted); }
+@media (max-width: 1050px) {
+  .donor-desktop-table { display: none; }
+  .donor-record-cards, .donor-eligibility-cards { display: block; }
+}
+@media (max-width: 700px) {
+  .donor-stats { grid-template-columns: 1fr 1fr; }
+  .donor-stats > div:last-child { grid-column: 1 / -1; }
+  .donor-stats > div { padding: 1rem; }
+  .donor-history-tools > p { flex-basis: 100%; }
+  .donor-history-tools .field { flex: 1; }
+  .donor-profile-grid { grid-template-columns: 1fr; gap: 1.5rem; }
+  .donor-page .donor-contact-panel { padding: 1.2rem; }
+  .donor-quick-links { flex-direction: column; align-items: start; }
+}

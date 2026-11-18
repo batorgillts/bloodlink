@@ -4,9 +4,10 @@ from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework_simplejwt.views import TokenObtainPairView
 
 from . import services
-from .serializers import DonorRegistrationSerializer
+from .serializers import DonorRegistrationSerializer, SignInSerializer
 
 
 class DonorRegistrationView(APIView):
@@ -27,3 +28,14 @@ class DonorRegistrationView(APIView):
         return Response(
             {"email": user.email, "role": user.role, **tokens}, status=status.HTTP_201_CREATED
         )
+
+
+class SignInView(TokenObtainPairView):
+    """POST /api/auth/token/ (US-02, US-06).
+
+    200: access and refresh tokens, plus the account's email and role
+    400: email or password missing
+    401: wrong credentials or deactivated account
+    """
+
+    serializer_class = SignInSerializer

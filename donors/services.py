@@ -140,17 +140,29 @@ def _eligibility_payload(donor, today):
         "no_donation_history": not recorded,
         "message": None if recorded else NO_HISTORY_MESSAGE,
         "donations": [_donation_row(donation) for donation in donations],
-        "eligibility": [_eligibility_row(row) for row in calculated],
+        "eligibility": [
+            {**_eligibility_row(row), "allowed_components": rule.allowed_components}
+            for row, rule in zip(calculated, rules)
+        ],
     }
 
 
 def _donation_row(donation):
     return {
         "donation_id": donation.pk,
+        "recorded_by": (
+            donation.recorded_by.get_full_name().strip()
+            or f"Coordinator #{donation.recorded_by_id}"
+        ),
         "donation_type": donation.donation_type_id,
         "donation_date": donation.donation_date.isoformat(),
         "blood_type": donation.blood_type,
         "volume_ml": donation.volume_ml,
+        "unit_codes": [unit.unit_code for unit in donation.blood_units.all()],
+        "units": [{"id": unit.pk, "unit_code": unit.unit_code, "component": unit.component,
+                   "collected_at": unit.collected_at.isoformat()}
+                  for unit in donation.blood_units.all()],
+        "can_delete": not bool(donation.blood_units.all()),
     }
 
 
@@ -181,6 +193,11 @@ def delete_donation(user, donor_id, donation_id):
         donation = repository.locked_donation(current.pk, donation_id)
         if donation is None:
             raise NotFound("Donation entry not found for this donor.")
+        if donation.blood_units.exists():
+            raise Conflict(
+                "This donation is linked to blood inventory and cannot be deleted. "
+                "Its history and eligibility must be retained."
+            )
         repository.remove_donation(donation)
         # Calculate inside the transaction: failure rolls the deletion back.
         return {
@@ -226,6 +243,15 @@ def withdraw_registration(user_id, donor_id=None):
 INACTIVE_DONOR = "Donations can only be recorded for an active donor."
 
 
+def validate_donation_date(donor, value):
+    if value < donor.date_of_birth:
+        raise ValidationError({"donation_date": [
+            "Donation date cannot be before the donor's date of birth. Check the year."
+        ]})
+    if value > bank_today():
+        raise ValidationError({"donation_date": ["Donation date cannot be in the future."]})
+
+
 def record_donation(donor_id, data, coordinator):
     """US-09 implementation"""
 
@@ -241,6 +267,7 @@ def record_donation(donor_id, data, coordinator):
             raise ValidationError(
                 {"blood_type": [f"Does not match the donor's blood type ({donor.blood_type})."]}
             )
+        validate_donation_date(donor, donation_date)
         _check_interval(donor.pk, rule, donation_date)
 
         donation = repository.create_donation(
@@ -255,8 +282,8 @@ def record_donation(donor_id, data, coordinator):
     return {"donation": _donation_row(donation), **_eligibility_payload(donor, bank_today())}
 
 
-def _check_interval(donor_id, rule, donation_date):
-    dates = repository.donation_dates(donor_id, rule.donation_type)
+def _check_interval(donor_id, rule, donation_date, exclude_id=None):
+    dates = repository.donation_dates(donor_id, rule.donation_type, exclude_id=exclude_id)
     # Same formula as US-04
     on_that_day = calculator.calculate_eligibility(
         rules=[(rule.donation_type, rule.min_interval_days)],

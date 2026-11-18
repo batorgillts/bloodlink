@@ -1,10 +1,30 @@
-"""Database operations for US-11 blood request records."""
+"""Database access for requests, reservations, history and compatible inventory."""
 
-from .models import BloodRequest
+from django.db.models import Max, OuterRef, Prefetch, Q, Subquery
+
+from donors.models import DonationIntervalRule, Donor
+from inventory.models import BloodUnit, CompatibilityRule
+
+from .models import BloodRequest, RequestEvent, Reservation
 
 
-def list_blood_requests():
-    return BloodRequest.objects.select_related("logged_by").all()
+def with_reserved_units(requests):
+    """US-16: load each request's active reservations and their units in one extra query."""
+    active = Reservation.objects.filter(released_at__isnull=True).select_related("unit")
+    return requests.prefetch_related(
+        Prefetch("reservations", queryset=active, to_attr="active_reservations")
+    )
+
+
+def list_blood_requests(*, status=None):
+    requests = BloodRequest.objects.select_related("logged_by").all()
+    if status is not None:
+        requests = requests.filter(status__in=status)
+    return with_reserved_units(requests)
+
+
+def find_request_with_reserved_units(request_id):
+    return with_reserved_units(BloodRequest.objects.filter(pk=request_id)).first()
 
 
 def create_blood_request(*, logged_by, blood_type, component, quantity):
@@ -14,3 +34,134 @@ def create_blood_request(*, logged_by, blood_type, component, quantity):
         component=component,
         quantity=quantity,
     )
+
+
+def request_for_update(request_id):
+    return BloodRequest.objects.select_for_update().filter(pk=request_id).first()
+
+
+def find_request(request_id):
+    return BloodRequest.objects.filter(pk=request_id).first()
+
+
+def active_reservations_for_update(request_id):
+    return list(
+        Reservation.objects.select_for_update()
+        .filter(request_id=request_id, released_at__isnull=True)
+        .order_by("id")
+    )
+
+
+def active_reservation_for_unit(unit_id, *, lock=False):
+    reservations = Reservation.objects.filter(unit_id=unit_id, released_at__isnull=True)
+    if lock:
+        reservations = reservations.select_for_update()
+    return reservations.first()
+
+
+def count_active_reservations(request_id):
+    return Reservation.objects.filter(request_id=request_id, released_at__isnull=True).count()
+
+
+def unit_for_update(unit_id):
+    return BloodUnit.objects.select_for_update().get(pk=unit_id)
+
+
+def save_request_status(blood_request):
+    blood_request.save(update_fields=["status"])
+
+
+def save_reservation_release(reservation):
+    reservation.save(update_fields=["released_at", "release_reason"])
+
+
+def save_unit_status(unit):
+    unit.save(update_fields=["status"])
+
+
+def create_request_event(**fields):
+    return RequestEvent.objects.create(**fields)
+
+
+def request_events(request_id):
+    return RequestEvent.objects.filter(request_id=request_id).select_related("actor", "unit")
+
+
+def find_matching_request(request_id):
+    return BloodRequest.objects.filter(pk=request_id).first()
+
+
+def compatible_units(blood_request):
+    rules = CompatibilityRule.objects.filter(
+        component=blood_request.component,
+        request_blood_type=blood_request.blood_type,
+    )
+    return (
+        BloodUnit.objects.usable()
+        .filter(
+            component=blood_request.component,
+            blood_type__in=rules.values("unit_blood_type"),
+        )
+        .annotate(
+            is_identical=Subquery(
+                rules.filter(unit_blood_type=OuterRef("blood_type")).values("is_identical")[:1]
+            )
+        )
+        .order_by("-is_identical", "expires_at", "unit_code")
+    )
+
+
+def interval_days(donation_type):
+    return (
+        DonationIntervalRule.objects.filter(donation_type=donation_type)
+        .values_list("min_interval_days", flat=True)
+        .first()
+    )
+
+
+def compatible_donors(blood_request, donation_type):
+    """US-18: active donors whose blood type the component's rules allow for this request.
+
+    Each donor carries their latest donation of `donation_type` (for eligibility) and their
+    latest donation of any type (shown to the coordinator).
+    """
+    rules = CompatibilityRule.objects.filter(
+        component=blood_request.component,
+        request_blood_type=blood_request.blood_type,
+    )
+    return (
+        Donor.objects.filter(
+            status=Donor.Status.ACTIVE,
+            blood_type__in=rules.values("unit_blood_type"),
+        )
+        .select_related("user")
+        .annotate(
+            last_of_type=Max(
+                "donations__donation_date",
+                filter=Q(donations__donation_type_id=donation_type),
+            ),
+            last_donation_date=Max("donations__donation_date"),
+            is_identical=Subquery(
+                rules.filter(unit_blood_type=OuterRef("blood_type")).values("is_identical")[:1]
+            ),
+        )
+        .order_by("-is_identical", "full_name", "id")
+    )
+
+
+def units_for_update(unit_ids):
+    """Lock the selected units in id order, so two reservations never deadlock."""
+    return list(BloodUnit.objects.select_for_update().filter(pk__in=unit_ids).order_by("pk"))
+
+
+def compatible_unit_types(blood_request):
+    return set(
+        CompatibilityRule.objects.filter(
+            component=blood_request.component,
+            request_blood_type=blood_request.blood_type,
+        ).values_list("unit_blood_type", flat=True)
+    )
+
+
+def create_reservation(*, request, unit, reserved_by):
+    return Reservation.objects.create(request=request, unit=unit, reserved_by=reserved_by)

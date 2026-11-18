@@ -5,17 +5,26 @@ from rest_framework.views import APIView
 
 from accounts.permissions import IsCoordinator
 
-from . import services
-from .serializers import BloodRequestSerializer
+from . import donor_suggestions, matching, services
+from .serializers import (
+    BloodRequestListParamsSerializer,
+    BloodRequestSerializer,
+    ConfirmCancelSerializer,
+    MatchedUnitSerializer,
+    RequestEventSerializer,
+    ReserveUnitsSerializer,
+)
 
 
 class BloodRequestListCreateView(APIView):
-    """US-11: coordinators can log requests and list/filter the request records."""
+    """US-11: coordinators can log requests and list all request records."""
 
     permission_classes = [IsAuthenticated, IsCoordinator]
 
     def get(self, request):
-        records = services.list_blood_requests()
+        params = BloodRequestListParamsSerializer(data=request.query_params)
+        params.is_valid(raise_exception=True)
+        records = services.list_blood_requests(status=params.validated_data.get("status"))
         return Response(BloodRequestSerializer(records, many=True).data)
 
     def post(self, request):
@@ -24,5 +33,110 @@ class BloodRequestListCreateView(APIView):
         record = services.log_blood_request(data.validated_data, request.user)
         return Response(
             BloodRequestSerializer(record).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class BloodRequestDetailView(APIView):
+    """US-16: open one request and see the units reserved for it."""
+
+    permission_classes = [IsAuthenticated, IsCoordinator]
+
+    def get(self, request, request_id):
+        blood_request = services.get_blood_request(request_id)
+        return Response(BloodRequestSerializer(blood_request).data)
+
+
+class BloodRequestCancelView(APIView):
+    """US-19: confirm cancellation, release reserved units, and log the change."""
+
+    permission_classes = [IsAuthenticated, IsCoordinator]
+
+    def post(self, request, request_id):
+        confirmation = ConfirmCancelSerializer(data=request.data)
+        confirmation.is_valid(raise_exception=True)
+        blood_request, released_units = services.cancel_blood_request(
+            request_id,
+            request.user,
+        )
+        return Response(
+            {
+                **BloodRequestSerializer(blood_request).data,
+                "released_units": released_units,
+            }
+        )
+
+
+class BloodRequestHistoryView(APIView):
+    """Coordinator-only append-only history for one blood request."""
+
+    permission_classes = [IsAuthenticated, IsCoordinator]
+
+    def get(self, request, request_id):
+        events = services.get_request_history(request_id)
+        return Response(RequestEventSerializer(events, many=True).data)
+
+
+class BloodRequestMatchView(APIView):
+    """Suggest compatible units without reserving or changing inventory."""
+
+    permission_classes = [IsAuthenticated, IsCoordinator]
+
+    def get(self, request, request_id):
+        units = MatchedUnitSerializer(matching.match_blood_request(request_id), many=True).data
+        return Response(
+            {
+                "request_id": request_id,
+                "units": units,
+                "message": "" if units else "No compatible units available",
+            }
+        )
+
+
+class DonorSuggestionsView(APIView):
+    """compatible donors who are eligible today, to contact when stock is short."""
+
+    permission_classes = [IsAuthenticated, IsCoordinator]
+
+    def get(self, request, request_id):
+        blood_request, donation_type, suggestions = donor_suggestions.suggest_donors(request_id)
+        donors = [
+            {
+                "donor_id": donor.pk,
+                "full_name": donor.full_name,
+                "blood_type": donor.blood_type,
+                "is_identical": donor.is_identical,
+                "last_donation_date": donor.last_donation_date,
+                "next_eligible_date": row["next_eligible_date"],
+                "email": donor.user.email,
+                "phone": donor.phone,
+            }
+            for donor, row in suggestions
+        ]
+        return Response(
+            {
+                "request_id": blood_request.pk,
+                "blood_type": blood_request.blood_type,
+                "component": blood_request.component,
+                "donation_type": donation_type,
+                "donors": donors,
+                "message": "" if donors else donor_suggestions.NO_DONORS_MESSAGE,
+            }
+        )
+
+
+class BloodRequestReserveView(APIView):
+    """US-16: reserve selected compatible units for a request."""
+
+    permission_classes = [IsAuthenticated, IsCoordinator]
+
+    def post(self, request, request_id):
+        data = ReserveUnitsSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        blood_request, remaining = services.reserve_units(
+            request_id, data.validated_data["unit_ids"], request.user
+        )
+        return Response(
+            {**BloodRequestSerializer(blood_request).data, "remaining_quantity": remaining},
             status=status.HTTP_201_CREATED,
         )

@@ -27,6 +27,14 @@ class ContactSerializer(serializers.Serializer):
     phone = serializers.CharField(read_only=True)
 
 
+class DonorProfileSerializer(ContactSerializer):
+    """Read-only fields for the signed-in donor's own portal."""
+
+    full_name = serializers.CharField(read_only=True)
+    blood_type = serializers.CharField(read_only=True)
+    status = serializers.CharField(read_only=True)
+
+
 class ContactUpdateSerializer(serializers.Serializer):
     email = serializers.EmailField(max_length=254, required=False)
     phone = serializers.RegexField(
@@ -59,6 +67,8 @@ class ContactUpdateSerializer(serializers.Serializer):
 class DonorSearchParamsSerializer(serializers.Serializer):
     """Optional filters for coordinator donor search (US-08)."""
 
+    search = serializers.CharField(required=False, allow_blank=True, max_length=254)
+    limit = serializers.IntegerField(required=False, min_value=1, max_value=50)
     name = serializers.CharField(required=False, allow_blank=False, max_length=200)
     email = serializers.CharField(required=False, allow_blank=False, max_length=254)
     blood_type = serializers.ChoiceField(required=False, choices=BloodType.choices)

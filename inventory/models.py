@@ -42,6 +42,12 @@ class BloodUnit(models.Model):
         OTHER = "other", "Other"
 
     unit_code = models.CharField(max_length=32, unique=True)
+    # Nullable only for inventory recorded before source tracking was introduced.
+    # Several processed units may come from the same donation.
+    donation = models.ForeignKey(
+        "donors.Donation", on_delete=models.PROTECT, null=True, blank=True,
+        related_name="blood_units",
+    )
     blood_type = models.CharField(max_length=3, choices=BloodType.choices)
     component = models.CharField(max_length=10, choices=Component.choices)
     collected_at = models.DateTimeField()
@@ -49,6 +55,15 @@ class BloodUnit(models.Model):
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.AVAILABLE)
     discard_reason = models.CharField(
         max_length=20, choices=DiscardReason.choices, blank=True, default=""
+    )
+    # wastage is recorded with when and by whom, not just the reason.
+    discarded_at = models.DateTimeField(null=True, blank=True)
+    discarded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="+",
     )
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, related_name="+"
@@ -97,5 +112,43 @@ class BloodUnit(models.Model):
             return self.Status.EXPIRED
         return self.status
 
+    @property
+    def can_edit(self):
+        return self.status in (self.Status.AVAILABLE, self.Status.EXPIRED)
+
+    @property
+    def can_discard(self):
+        """the discard option is not offered again."""
+        return self.status != self.Status.DISCARDED
+
     def __str__(self):
         return f"{self.unit_code} ({self.blood_type} {self.component})"
+
+
+class CompatibilityRule(models.Model):
+    """Configured unit-to-request compatibility, scoped to a component."""
+
+    component = models.CharField(max_length=10, choices=Component.choices)
+    request_blood_type = models.CharField(max_length=3, choices=BloodType.choices)
+    unit_blood_type = models.CharField(max_length=3, choices=BloodType.choices)
+    is_identical = models.BooleanField()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["component", "request_blood_type", "unit_blood_type"],
+                name="compatibility_rule_unique",
+            ),
+            models.CheckConstraint(
+                condition=Q(component__in=Component.values),
+                name="compatibility_component_valid",
+            ),
+            models.CheckConstraint(
+                condition=Q(request_blood_type__in=BloodType.values),
+                name="compatibility_request_type_valid",
+            ),
+            models.CheckConstraint(
+                condition=Q(unit_blood_type__in=BloodType.values),
+                name="compatibility_unit_type_valid",
+            ),
+        ]

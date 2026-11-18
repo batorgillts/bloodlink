@@ -18,9 +18,9 @@ Including another URLconf
 from django.contrib import admin
 from django.http import JsonResponse
 from django.urls import include, path
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from rest_framework_simplejwt.views import TokenRefreshView
 
-from accounts.views import DonorRegistrationView
+from accounts.views import DonorRegistrationView, SignInView
 from inventory import views as inventory_views
 
 
@@ -36,10 +36,17 @@ urlpatterns = [
     path("api/donors/", include("donors.urls")),
     # Authentication & Access
     path("api/auth/register/", DonorRegistrationView.as_view(), name="register"),
-    path("api/auth/token/", TokenObtainPairView.as_view(), name="token"),
+    path("api/auth/token/", SignInView.as_view(), name="token"),
     path("api/auth/token/refresh/", TokenRefreshView.as_view(), name="token-refresh"),
     # Inventory Management (US-07)
     path("api/units/", inventory_views.BloodUnitListCreate.as_view(), name="units"),
+    path("api/units/<int:unit_id>/", inventory_views.BloodUnitDetail.as_view(), name="unit-detail"),
+    # US-17
+    path(
+        "api/units/<int:unit_id>/discard/",
+        inventory_views.BloodUnitDiscard.as_view(),
+        name="unit-discard",
+    ),
     # Blood Request Management
     path("api/requests/", include("request.urls")),
 ]

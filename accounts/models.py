@@ -49,6 +49,12 @@ class User(AbstractUser):
             models.UniqueConstraint(Lower("email"), name="user_email_unique_ci"),
         ]
 
+    def save(self, *args, **kwargs):
+        # Lowercase on every save (admin panel included) so sign-in always matches.
+        if self.email:
+            self.email = self.email.strip().lower()
+        super().save(*args, **kwargs)
+
     @property
     def is_coordinator(self):
         return self.role == self.Role.COORDINATOR
