@@ -62,7 +62,76 @@ python manage.py test
 ```
 
 GitHub Actions runs the same lint and tests against PostgreSQL on every pull request
-into `develop` or `main`.
+into `develop` or `main`. Frontend checks are `npm run lint`, `npm test`, and
+`npm run build` from the `frontend` folder.
+
+## Frontend
+
+The React app in `frontend/` uses the Django API. It covers donor registration,
+sign-in, contact, eligibility, and withdrawal, plus coordinator donor records,
+donation entry and deletion, inventory, requests, component matching, reservation,
+cancellation, donor suggestions, and per-request activity. Use synthetic data only.
+
+From the project root, with the Python virtual environment already created:
+
+```powershell
+cd frontend
+npm ci
+cd ..
+powershell.exe -ExecutionPolicy Bypass -File .\start-demo.ps1
+```
+
+```bash
+cd frontend
+npm ci
+cd ..
+```
+
+Open http://127.0.0.1:5174 and leave the terminal open. Ctrl+C stops the demo.
+The launcher uses `config.demo_settings` and `bloodlink-demo.sqlite3`, separate from
+`db.sqlite3` and `DATABASE_URL`. Do not deploy the demo settings. Re-running the seed
+keeps existing passwords, withdrawals, reservations, and requests.
+
+| Role | Email | Initial password |
+|---|---|---|
+| Coordinator | coordinator@example.com | abc123456 |
+| Donor | donor@example.com | abc123456 |
+
+The donor starts with a recent plasma donation. Extra synthetic donors are
+`donor1@bloodlink.example` through `donor4@bloodlink.example`, password
+`BloodlinkDemo2026!`. These accounts are for local demonstration only.
+
+To start the same demo without the launcher, use two terminals from the project root.
+
+```powershell
+.\.venv\Scripts\python.exe manage.py migrate --settings=config.demo_settings
+.\.venv\Scripts\python.exe manage.py seed_demo --settings=config.demo_settings
+.\.venv\Scripts\python.exe manage.py runserver 127.0.0.1:8001 --settings=config.demo_settings
+```
+
+```powershell
+cd frontend
+$env:VITE_API_URL = 'http://127.0.0.1:8001'
+npm run dev -- --host 127.0.0.1 --port 5174
+```
+
+Ordinary development stays on port 8000 for Django and port 5173 for `npm run dev`
+inside `frontend`. `VITE_API_URL` selects the backend.
+
+A short coordinator-then-donor walk-through:
+
+1. Sign in as the coordinator, search the synthetic donor, record a whole-blood donation dated today, and show the new next eligible date. Delete that entry with confirmation and show eligibility restored.
+2. Record two new RBC units, A+ and O-, then create an A+ RBC request for two units.
+3. Match, reserve one unit, and show Partially fulfilled. Cancel the request and show the unit available again.
+4. Create another request, reserve both units, and show Fulfilled. Open eligible donor suggestions, then discard a reserved unit and confirm the warning.
+5. Sign in as the donor and show history, eligibility, and a saved phone change. To show withdrawal, register a disposable donor instead of deactivating the primary demo account.
+
+Inventory can be searched by partial unit code, donor name, or email together with the blood type, component, and status filters. A unit is stored against a source donation: whole blood can supply red cells, plasma, or platelets; red-cell donations supply red cells; plasma and platelet donations supply their own component. Recording a new donation with a unit saves both in one transaction. Editing a unit can correct its component, collection time, or source donation type and recalculates expiry. Reserved and discarded units are not editable.
+
+Donor pages are `/me`, `/me/history`, and `/me/contact`. Registration asks for a birthday as MM/DD/YYYY and requires the password to be entered twice; only the password is sent to the API.
+`GET /api/donors/me/profile/` returns only the signed-in active donor's own profile
+and cannot be used to edit it. Donation history includes a `recorded_by` name, or
+`Coordinator #<id>` when no name is stored. Staff email addresses are not included.
 
 ## API
 
@@ -112,8 +181,8 @@ for the API contract, acceptance tests, dependency on US-01, and frontend handof
   retaining linked donation history.
 - Both require a coordinator token and JSON `{"confirm": true}`. See
   [US-10 API, tests and demo](docs/US-10.md) for errors and integration requirements.
-- US-08 search uses active donor filters and is tested with deletion. Matching
-  and React UI still need integration before the full story is Done.
+- US-08 search uses active donor filters and is tested with deletion. The React
+  demo includes donor search, record edits, and deletion.
 
 
 US-08 donor search, walk-in registration, profile updates, and coordinator-only
