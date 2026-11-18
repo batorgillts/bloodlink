@@ -17,7 +17,7 @@ Use Python 3.12, matching CI. The current Django 5.1 dependency does not support
 | Chenshuo Li | US-03: donor contact information (backend) | @KoharuLee |
 | Miaomiao Li |US-08: search and manage Donor Records; US-11: Log in blood requests |@Miaomiao-Li-Jodie |
 | Parvathi Krishnan |US-01(Backend: donor registration and donor records) |@parvathikrishnan11 |
-| Shuaiyu Chen | US-04: check donation eligibility (backend); US-05: withdraw donor registration (backend) | @CSY-Eason |
+| Shuaiyu Chen | US-04: check donation eligibility (backend); US-05: withdraw donor registration (backend); US-13: match red blood cell requests (backend) | @CSY-Eason |
 
 **Course:** CS-GY 6063 Software Engineering I, NYU Tandon, Fall 2026
 **Instructor:** Raz Saremi
