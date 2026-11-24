@@ -155,6 +155,8 @@ and cannot be used to edit it. Donation history includes a `recorded_by` name, o
 | GET | `/api/requests/<request_id>/` | Open one request with `reserved_units`: the units currently held for it (unit id, code, blood type, component, expiry, reserved time). 404 if not found (US-16) | Coordinator |
 | POST | `/api/units/` (`unit_code`, `blood_type`, `component`, `collected_at`, `donor_id`, plus `donation_id` OR `donation_type` and `volume_ml`) | Record a unit linked to its source donation. A new donation and unit are saved atomically; an existing donation is reused without changing eligibility. Expiry follows shelf-life rules. 400 for invalid source, blood type/date mismatch or ineligible donation; 409 for duplicate unit code | Coordinator |
 | GET | `/api/units/?blood_type=&component=&status=` | View inventory, earliest expiry first; `status=available` excludes expired units (US-07) | Coordinator |
+| GET | `/api/inventory/dashboard/` | Inventory dashboard (US-12): low-stock alerts, the expiring-soon report grouped by component, and available stock with the unit closest to expiry for each blood type and component. Only usable units (available, not expired) count | Coordinator |
+| GET, PUT | `/api/inventory/thresholds/` | List or set a low-stock threshold per blood type and component (US-12), with an optional `expiring_soon_days` override. 400 if `minimum_units` is not a positive whole number, or the window is not shorter than the component's shelf life | Coordinator |
 | GET | `/api/units/<unit_id>/` | View one unit, including discard details and `can_discard` (false once discarded) | Coordinator |
 | PATCH | `/api/units/<unit_id>/` (`component`, `collected_at`, optional `donation_type`) | Correct an unreserved, non-discarded unit. Recalculates expiry; calendar-date corrections update the source donation and shift linked units together. Explicit source-type corrections recalculate eligibility and must support every linked component. No extra donation is created | Coordinator |
 | POST | `/api/units/<unit_id>/discard/` (`reason`, `confirm`) | Discard a unit with reason `expired`, `damaged`, `failed_testing` or `other` (US-17). 400 if the reason is missing, or not `expired` for an expired unit; 409 if already discarded; 409 with `confirm_required` and the request ID if the unit is reserved, until sent again with `confirm: true`. Releases the reservation and sets the request to partially fulfilled (or pending if none left) | Coordinator |
@@ -218,6 +220,8 @@ US-19 tests are in `request/test_cancellation.py`.
 US-17 tests are in `inventory/test_discard.py`.
 
 US-18 tests are in `request/test_donor_suggestions.py`.
+
+US-12 tests are in `inventory/test_stock_alerts.py` and `frontend/src/StockAlerts.test.jsx`.
 
 ## Project layout
 

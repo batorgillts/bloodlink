@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import BloodUnit, ShelfLifeRule
+from .models import BloodUnit, ShelfLifeRule, StockThreshold
 
 
 @admin.register(BloodUnit)
@@ -20,3 +20,9 @@ class BloodUnitAdmin(admin.ModelAdmin):
 
 
 admin.site.register(ShelfLifeRule)
+
+
+@admin.register(StockThreshold)
+class StockThresholdAdmin(admin.ModelAdmin):
+    list_display = ("blood_type", "component", "minimum_units", "expiring_soon_days", "updated_at")
+    list_filter = ("component", "blood_type")

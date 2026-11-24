@@ -6,7 +6,7 @@ from rest_framework import serializers
 from config.exceptions import Conflict
 from donors.models import DonationIntervalRule
 
-from .models import BloodUnit
+from .models import BloodUnit, ShelfLifeRule, StockThreshold
 
 
 class InventorySearchParamsSerializer(serializers.Serializer):
@@ -157,4 +157,62 @@ class DiscardUnitSerializer(serializers.Serializer):
             allowed = ", ".join(str(label) for _, label in BloodUnit.DiscardReason.choices)
             raise serializers.ValidationError({"reason": [f"Choose one of: {allowed}."]})
         attrs["reason"] = code
+        return attrs
+
+
+THRESHOLD_MESSAGE = "The low-stock threshold must be a positive whole number."
+WINDOW_MESSAGE = "The expiring-soon window must be a positive whole number of days."
+
+
+class StockThresholdSerializer(serializers.ModelSerializer):
+    """US-12: one low-stock threshold, with an optional expiring-soon override."""
+
+    minimum_units = serializers.IntegerField(
+        min_value=1,
+        error_messages={
+            "required": THRESHOLD_MESSAGE,
+            "null": THRESHOLD_MESSAGE,
+            "invalid": THRESHOLD_MESSAGE,
+            "min_value": THRESHOLD_MESSAGE,
+            "max_string_length": THRESHOLD_MESSAGE,
+        },
+    )
+    expiring_soon_days = serializers.IntegerField(
+        min_value=1,
+        required=False,
+        allow_null=True,
+        error_messages={"invalid": WINDOW_MESSAGE, "min_value": WINDOW_MESSAGE},
+    )
+
+    class Meta:
+        model = StockThreshold
+        fields = [
+            "id",
+            "blood_type",
+            "component",
+            "minimum_units",
+            "expiring_soon_days",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "updated_at"]
+        # Saving is an upsert by blood type and component, so skip the unique check.
+        validators = []
+
+    def validate(self, attrs):
+        days = attrs.get("expiring_soon_days")
+        if days:
+            shelf_life = (
+                ShelfLifeRule.objects.filter(component=attrs["component"])
+                .values_list("shelf_life_days", flat=True)
+                .first()
+            )
+            if shelf_life and days >= shelf_life:
+                raise serializers.ValidationError(
+                    {
+                        "expiring_soon_days": [
+                            f"The expiring-soon window must be shorter than the "
+                            f"{shelf_life}-day shelf life of this component."
+                        ]
+                    }
+                )
         return attrs

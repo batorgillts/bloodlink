@@ -40,6 +40,17 @@ urlpatterns = [
     path("api/auth/token/refresh/", TokenRefreshView.as_view(), name="token-refresh"),
     # Inventory Management (US-07)
     path("api/units/", inventory_views.BloodUnitListCreate.as_view(), name="units"),
+    # US-12
+    path(
+        "api/inventory/dashboard/",
+        inventory_views.InventoryDashboardView.as_view(),
+        name="inventory-dashboard",
+    ),
+    path(
+        "api/inventory/thresholds/",
+        inventory_views.StockThresholdView.as_view(),
+        name="stock-thresholds",
+    ),
     path("api/units/<int:unit_id>/", inventory_views.BloodUnitDetail.as_view(), name="unit-detail"),
     # US-17
     path(

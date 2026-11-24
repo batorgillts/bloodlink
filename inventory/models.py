@@ -14,6 +14,9 @@ class ShelfLifeRule(models.Model):
 
     component = models.CharField(max_length=10, choices=Component.choices, unique=True)
     shelf_life_days = models.PositiveIntegerField()
+    # US-12: how many days before expiry a unit counts as "expiring soon". It follows
+    # the component's shelf life (seeded by migration) and a threshold can override it.
+    expiring_soon_days = models.PositiveIntegerField(default=7)
 
     def __str__(self):
         return f"{self.component}: {self.shelf_life_days} days"
@@ -152,3 +155,32 @@ class CompatibilityRule(models.Model):
                 name="compatibility_unit_type_valid",
             ),
         ]
+
+
+class StockThreshold(models.Model):
+    """US-12: a coordinator-set low-stock alert level for one blood type and component."""
+
+    blood_type = models.CharField(max_length=3, choices=BloodType.choices)
+    component = models.CharField(max_length=10, choices=Component.choices)
+    minimum_units = models.PositiveIntegerField()
+    # Optional override of the component's expiring-soon window; null = component default.
+    expiring_soon_days = models.PositiveIntegerField(null=True, blank=True)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, related_name="+"
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["component", "blood_type"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["blood_type", "component"], name="stock_threshold_unique"
+            ),
+            # AC5: the database also refuses a threshold that is not positive.
+            models.CheckConstraint(
+                condition=Q(minimum_units__gte=1), name="stock_threshold_positive"
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.blood_type} {self.component}: alert below {self.minimum_units}"
