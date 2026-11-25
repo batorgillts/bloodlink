@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q
 from django.utils import timezone
@@ -109,6 +110,16 @@ class Reservation(models.Model):
         ]
 
 
+class RequestEventQuerySet(models.QuerySet):
+    """US-20: history rows are append-only, including bulk update and delete."""
+
+    def update(self, **kwargs):
+        raise ValidationError("Request history cannot be edited or deleted.")
+
+    def delete(self):
+        raise ValidationError("Request history cannot be edited or deleted.")
+
+
 class RequestEvent(models.Model):
     """Append-only history for blood request activity."""
 
@@ -144,5 +155,15 @@ class RequestEvent(models.Model):
         related_name="request_events",
     )
 
+    objects = RequestEventQuerySet.as_manager()
+
     class Meta:
         ordering = ["created_at", "id"]
+
+    def save(self, *args, **kwargs):
+        if self.pk is not None:
+            raise ValidationError("Request history cannot be edited or deleted.")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Request history cannot be edited or deleted.")

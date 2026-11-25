@@ -83,6 +83,8 @@ class ReserveUnitsSerializer(serializers.Serializer):
 
 class RequestEventSerializer(serializers.ModelSerializer):
     actor_email = serializers.EmailField(source="actor.email", read_only=True)
+    actor_name = serializers.SerializerMethodField()
+    unit_code = serializers.SerializerMethodField()
 
     class Meta:
         model = RequestEvent
@@ -92,12 +94,65 @@ class RequestEventSerializer(serializers.ModelSerializer):
             "from_status",
             "to_status",
             "unit",
+            "unit_code",
             "matched_unit_codes",
             "created_at",
             "actor",
             "actor_email",
+            "actor_name",
         ]
         read_only_fields = fields
+
+    def get_actor_name(self, event):
+        name = event.actor.get_full_name().strip()
+        return name or event.actor.email
+
+    def get_unit_code(self, event):
+        return event.unit.unit_code if event.unit_id else ""
+
+
+class RequestHistoryQuerySerializer(serializers.Serializer):
+    """US-20: optional inclusive range on the date a request was logged."""
+
+    logged_from = serializers.DateField(required=False)
+    logged_to = serializers.DateField(required=False)
+
+    def validate(self, attrs):
+        start = attrs.get("logged_from")
+        end = attrs.get("logged_to")
+        if (start is None) != (end is None):
+            raise serializers.ValidationError("Enter both a start date and an end date.")
+        if start and end and start > end:
+            raise serializers.ValidationError(
+                "The start date must be on or before the end date."
+            )
+        return attrs
+
+
+class RequestAuditSerializer(serializers.ModelSerializer):
+    """US-20: one request plus the append-only events that explain how it was handled."""
+
+    coordinator = serializers.SerializerMethodField()
+    events = RequestEventSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = BloodRequest
+        fields = [
+            "id",
+            "blood_type",
+            "component",
+            "quantity",
+            "status",
+            "logged_at",
+            "logged_by",
+            "coordinator",
+            "events",
+        ]
+        read_only_fields = fields
+
+    def get_coordinator(self, blood_request):
+        name = blood_request.logged_by.get_full_name().strip()
+        return name or blood_request.logged_by.email
 
 
 class MatchedUnitSerializer(serializers.ModelSerializer):

@@ -3,6 +3,7 @@ from django.urls import path
 from .views import (
     BloodRequestCancelView,
     BloodRequestDetailView,
+    BloodRequestHistoryListView,
     BloodRequestHistoryView,
     BloodRequestListCreateView,
     BloodRequestMatchView,
@@ -37,5 +38,10 @@ urlpatterns = [
         "<int:request_id>/history/",
         BloodRequestHistoryView.as_view(),
         name="blood-request-history",
+    ),
+    path(
+        "history/",
+        BloodRequestHistoryListView.as_view(),
+        name="blood-request-history-list",
     ),
 ]
