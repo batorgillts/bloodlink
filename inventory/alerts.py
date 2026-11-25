@@ -87,7 +87,14 @@ def build_dashboard(now=None):
         {
             "component": component,
             "label": label,
+            # The component default; blood types with their own window are listed below.
             "window_days": default_window.get(component),
+            "overrides": [
+                {"blood_type": row["blood_type"], "window_days": row["expiring_soon_days"]}
+                for row in stock
+                if row["component"] == component
+                and row["expiring_soon_days"] != default_window.get(component)
+            ],
             "units": sorted(expiring[component], key=lambda u: (u["expires_at"], u["id"])),
         }
         for component, label in Component.choices

@@ -46,7 +46,12 @@ export function StockAlerts() {
             <h3>Expiring soon</h3>
             {data.expiring_soon.map((group) => (
               <div key={group.component} className="expiry-group">
-                <h4>{group.label} <span className="muted">(within {group.window_days} days)</span></h4>
+                <h4>{group.label} <span className="muted">(within {group.window_days} days by default)</span></h4>
+                {group.overrides?.length > 0 && (
+                  <p className="muted window-overrides">
+                    Own window: {group.overrides.map((o) => `${o.blood_type} ${o.window_days} days`).join(", ")}
+                  </p>
+                )}
                 <Table
                   rows={group.units}
                   empty={`No ${group.label.toLowerCase()} expiring soon.`}
@@ -54,6 +59,9 @@ export function StockAlerts() {
                     ["Unit", (u) => <strong>{u.unit_code}</strong>],
                     ["Blood type", (u) => <span className="blood-type">{u.blood_type}</span>],
                     ["Expires", (u) => time(u.expires_at)],
+                    ["Window", (u) => (u.window_days === group.window_days
+                      ? `${u.window_days} days`
+                      : `${u.window_days} days (${u.blood_type} setting)`)],
                   ]}
                 />
               </div>

@@ -6,7 +6,14 @@ from rest_framework import serializers
 from config.exceptions import Conflict
 from donors.models import DonationIntervalRule
 
-from .models import BloodUnit, ShelfLifeRule, StockThreshold
+from .models import (
+    THRESHOLD_MESSAGE,
+    WINDOW_MESSAGE,
+    BloodUnit,
+    ShelfLifeRule,
+    StockThreshold,
+    expiring_window_error,
+)
 
 
 class InventorySearchParamsSerializer(serializers.Serializer):
@@ -160,10 +167,6 @@ class DiscardUnitSerializer(serializers.Serializer):
         return attrs
 
 
-THRESHOLD_MESSAGE = "The low-stock threshold must be a positive whole number."
-WINDOW_MESSAGE = "The expiring-soon window must be a positive whole number of days."
-
-
 class StockThresholdSerializer(serializers.ModelSerializer):
     """US-12: one low-stock threshold, with an optional expiring-soon override."""
 
@@ -199,20 +202,13 @@ class StockThresholdSerializer(serializers.ModelSerializer):
         validators = []
 
     def validate(self, attrs):
-        days = attrs.get("expiring_soon_days")
-        if days:
-            shelf_life = (
-                ShelfLifeRule.objects.filter(component=attrs["component"])
-                .values_list("shelf_life_days", flat=True)
-                .first()
-            )
-            if shelf_life and days >= shelf_life:
-                raise serializers.ValidationError(
-                    {
-                        "expiring_soon_days": [
-                            f"The expiring-soon window must be shorter than the "
-                            f"{shelf_life}-day shelf life of this component."
-                        ]
-                    }
-                )
+        # Same rule as the admin form and ShelfLifeRule.clean() (review feedback on #35).
+        shelf_life = (
+            ShelfLifeRule.objects.filter(component=attrs["component"])
+            .values_list("shelf_life_days", flat=True)
+            .first()
+        )
+        error = expiring_window_error(attrs.get("expiring_soon_days"), shelf_life)
+        if error:
+            raise serializers.ValidationError({"expiring_soon_days": [error]})
         return attrs

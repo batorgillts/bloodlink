@@ -9,8 +9,8 @@ const response = (data, status = 200) =>
 const dashboard = {
   low_stock: [{ blood_type: "O-", component: "RBC", available: 1, minimum_units: 3 }],
   expiring_soon: [
-    { component: "RBC", label: "Red blood cells", window_days: 7, units: [
-      { id: 1, unit_code: "RBC-SOON", blood_type: "O-", component: "RBC", expires_at: "2026-11-27T10:00:00Z" },
+    { component: "RBC", label: "Red blood cells", window_days: 7, overrides: [], units: [
+      { id: 1, unit_code: "RBC-SOON", blood_type: "O-", component: "RBC", expires_at: "2026-11-27T10:00:00Z", window_days: 7 },
     ] },
     { component: "PLASMA", label: "Plasma", window_days: 30, units: [] },
     { component: "PLATELETS", label: "Platelets", window_days: 2, units: [] },
@@ -34,7 +34,7 @@ test("AC2/AC3: shows the low-stock alert, expiring units by component and closes
   render(<StockAlerts />);
   expect(await screen.findByText("Low stock: O- Red blood cells")).toBeInTheDocument();
   expect(screen.getByText(/1 available, alert below 3/)).toBeInTheDocument();
-  const rbc = screen.getByRole("heading", { name: /Red blood cells \(within 7 days\)/ }).parentElement;
+  const rbc = screen.getByRole("heading", { name: /Red blood cells \(within 7 days by default\)/ }).parentElement;
   expect(within(rbc).getByText("RBC-SOON")).toBeInTheDocument();
   expect(screen.getByText("No plasma expiring soon.")).toBeInTheDocument();
   expect(screen.getByText("Low stock", { selector: ".badge" })).toBeInTheDocument();
@@ -108,10 +108,27 @@ test("AC4: the inventory page reloads the dashboard after a unit is discarded", 
   });
   vi.stubGlobal("fetch", fetch);
   render(<App />);
-  const rbcHeading = await screen.findByRole("heading", { name: /Red blood cells \(within 7 days\)/ });
+  const rbcHeading = await screen.findByRole("heading", { name: /Red blood cells \(within 7 days by default\)/ });
   expect(within(rbcHeading.parentElement).getByText("RBC-SOON")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Discard RBC-SOON" }));
   fireEvent.change(screen.getByLabelText("Discard reason"), { target: { value: "damaged" } });
   fireEvent.click(screen.getByRole("button", { name: "Discard unit", exact: true }));
   await waitFor(() => expect(screen.getByText("No red blood cells expiring soon.")).toBeInTheDocument());
+});
+
+test("review: a blood type's own window is shown, not just the default", async () => {
+  const withOverride = {
+    ...dashboard,
+    expiring_soon: [
+      { component: "RBC", label: "Red blood cells", window_days: 7,
+        overrides: [{ blood_type: "O-", window_days: 14 }],
+        units: [{ id: 2, unit_code: "RBC-TEN", blood_type: "O-", component: "RBC", expires_at: "2026-12-05T10:00:00Z", window_days: 14 }] },
+      ...dashboard.expiring_soon.slice(1),
+    ],
+  };
+  vi.stubGlobal("fetch", vi.fn(() => response(withOverride)));
+  render(<StockAlerts />);
+  expect(await screen.findByRole("heading", { name: /Red blood cells \(within 7 days by default\)/ })).toBeInTheDocument();
+  expect(screen.getByText("Own window: O- 14 days")).toBeInTheDocument();
+  expect(screen.getByText("14 days (O- setting)")).toBeInTheDocument();
 });

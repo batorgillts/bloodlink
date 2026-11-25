@@ -218,3 +218,97 @@ class StockAlertTests(TestCase):
 
         with self.assertRaises(IntegrityError), transaction.atomic():
             StockThreshold.objects.create(blood_type="O-", component="RBC", minimum_units=0)
+
+    # Review feedback on #35: the report shows each blood type's own window
+    def test_report_lists_blood_types_with_their_own_window(self):
+        self.set_threshold(expiring_soon_days=14)
+        self.unit("TEN-DAYS", days_left=10)
+        rbc = next(g for g in self.dashboard()["expiring_soon"] if g["component"] == "RBC")
+        self.assertEqual(rbc["window_days"], 7)
+        self.assertEqual(rbc["overrides"], [{"blood_type": "O-", "window_days": 14}])
+        self.assertEqual(rbc["units"][0]["window_days"], 14)
+
+    def test_report_has_no_overrides_by_default(self):
+        groups = self.dashboard()["expiring_soon"]
+        self.assertTrue(all(g["overrides"] == [] for g in groups))
+
+
+class WindowValidationTests(TestCase):
+    """Review feedback on #35: the API and the admin apply the same window rule."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.admin = User.objects.create_superuser("admin@example.com", PASSWORD)
+
+    def setUp(self):
+        self.client.force_login(self.admin)
+        self.rbc = ShelfLifeRule.objects.get(component="RBC")
+
+    def rule_form(self, rule, **changes):
+        data = {
+            "component": rule.component,
+            "shelf_life_days": rule.shelf_life_days,
+            "expiring_soon_days": rule.expiring_soon_days,
+            **changes,
+        }
+        return self.client.post(f"/admin/inventory/shelfliferule/{rule.pk}/change/", data)
+
+    def threshold_form(self, **changes):
+        data = {"blood_type": "O-", "component": "PLATELETS", "minimum_units": 2, **changes}
+        return self.client.post("/admin/inventory/stockthreshold/add/", data)
+
+    def test_admin_rejects_a_zero_component_window(self):
+        res = self.rule_form(self.rbc, expiring_soon_days=0)
+        self.assertEqual(res.status_code, 200)  # the form is shown again with an error
+        self.assertContains(res, "positive whole number of days")
+        self.rbc.refresh_from_db()
+        self.assertEqual(self.rbc.expiring_soon_days, 7)
+
+    def test_admin_rejects_a_component_window_as_long_as_the_shelf_life(self):
+        res = self.rule_form(self.rbc, expiring_soon_days=42)
+        self.assertContains(res, "shorter than the 42-day shelf life")
+        self.rbc.refresh_from_db()
+        self.assertEqual(self.rbc.expiring_soon_days, 7)
+
+    def test_admin_accepts_a_valid_component_window(self):
+        res = self.rule_form(self.rbc, expiring_soon_days=10)
+        self.assertEqual(res.status_code, 302)
+        self.rbc.refresh_from_db()
+        self.assertEqual(self.rbc.expiring_soon_days, 10)
+
+    def test_admin_rejects_a_platelet_override_longer_than_the_shelf_life(self):
+        res = self.threshold_form(expiring_soon_days=10)
+        self.assertContains(res, "shorter than the 5-day shelf life")
+        self.assertFalse(StockThreshold.objects.exists())
+
+    def test_admin_rejects_zero_override_and_zero_threshold(self):
+        res = self.threshold_form(expiring_soon_days=0)
+        self.assertContains(res, "positive whole number of days")
+        self.assertContains(self.threshold_form(minimum_units=0), THRESHOLD_MESSAGE)
+        self.assertFalse(StockThreshold.objects.exists())
+
+    def test_admin_saves_a_valid_threshold_and_records_who(self):
+        res = self.threshold_form(expiring_soon_days=3)
+        self.assertEqual(res.status_code, 302)
+        threshold = StockThreshold.objects.get()
+        self.assertEqual(threshold.expiring_soon_days, 3)
+        self.assertEqual(threshold.updated_by, self.admin)
+
+    def test_shelf_life_cannot_be_shortened_below_an_existing_override(self):
+        StockThreshold.objects.create(
+            blood_type="O-", component="RBC", minimum_units=2, expiring_soon_days=14
+        )
+        res = self.rule_form(self.rbc, shelf_life_days=14)
+        self.assertContains(res, "shorten them first: O- (14 days)")
+        self.rbc.refresh_from_db()
+        self.assertEqual(self.rbc.shelf_life_days, 42)
+
+    def test_database_rejects_a_window_outside_the_shelf_life(self):
+        from django.db import IntegrityError, transaction
+
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            ShelfLifeRule.objects.filter(component="PLATELETS").update(expiring_soon_days=5)
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            StockThreshold.objects.create(
+                blood_type="O-", component="RBC", minimum_units=1, expiring_soon_days=0
+            )
