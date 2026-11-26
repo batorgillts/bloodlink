@@ -18,6 +18,7 @@ import { Form, Notice, Badge, Field, BloodFields, Header, Table, Modal, Resource
 import { BLOOD, COMPONENTS, title, date, time, useResource } from "./viewHelpers";
 import { DonorRegistry, DonorRecord } from "./DonorManagement";
 import { DiscardUnit, RequestExtras } from "./InventoryActions";
+import { StockAlerts } from "./StockAlerts";
 import { DonorOverview, DonorHistory, DonorContact } from "./DonorPortal";
 const home = (user) => (user?.role === "coordinator" ? "/requests" : "/me");
 
@@ -277,7 +278,9 @@ function Inventory() {
   const [query, setQuery] = useState("");
   const [creating, setCreating] = useState(false);
   const [message, setMessage] = useState("");
+  const [dashboardVersion, setDashboardVersion] = useState(0);
   const resource = useResource(`/api/units/${query}`);
+  const changed = () => { resource.reload(); setDashboardVersion((v) => v + 1); };
   return (
     <>
       <Header
@@ -289,6 +292,7 @@ function Inventory() {
         Track available units, components and expiry dates.
       </Header>
       <Notice>{message}</Notice>
+      <StockAlerts key={dashboardVersion} />
       <Form
         className="filters inventory-filters"
         onSubmit={(e) => {
@@ -356,9 +360,9 @@ function Inventory() {
           />
         )}
       </section>
-      {discarding && <DiscardUnit unit={discarding} onClose={()=>setDiscarding(null)} onDiscarded={()=>{setDiscarding(null);setMessage("Unit discarded. Any affected request has been updated.");resource.reload();}} />}
+      {discarding && <DiscardUnit unit={discarding} onClose={()=>setDiscarding(null)} onDiscarded={()=>{setDiscarding(null);setMessage("Unit discarded. Any affected request has been updated.");changed();}} />}
       {editing && <EditBloodUnit unit={editing} onClose={() => setEditing(null)} onSaved={() => {
-        setEditing(null); setMessage("Corrections saved. Source donation, expiry and eligibility have been recalculated."); resource.reload();
+        setEditing(null); setMessage("Corrections saved. Source donation, expiry and eligibility have been recalculated."); changed();
       }} />}
       {creating && (
         <RecordBloodUnit
@@ -368,7 +372,7 @@ function Inventory() {
             setMessage(
               `Unit ${unit.unit_code} linked to donation #${unit.donation_id}. Expiry: ${time(unit.expires_at)}. It appears when it matches the current filters.`,
             );
-            resource.reload();
+            changed();
           }}
         />
       )}

@@ -6,7 +6,14 @@ from rest_framework import serializers
 from config.exceptions import Conflict
 from donors.models import DonationIntervalRule
 
-from .models import BloodUnit
+from .models import (
+    THRESHOLD_MESSAGE,
+    WINDOW_MESSAGE,
+    BloodUnit,
+    ShelfLifeRule,
+    StockThreshold,
+    expiring_window_error,
+)
 
 
 class InventorySearchParamsSerializer(serializers.Serializer):
@@ -157,4 +164,51 @@ class DiscardUnitSerializer(serializers.Serializer):
             allowed = ", ".join(str(label) for _, label in BloodUnit.DiscardReason.choices)
             raise serializers.ValidationError({"reason": [f"Choose one of: {allowed}."]})
         attrs["reason"] = code
+        return attrs
+
+
+class StockThresholdSerializer(serializers.ModelSerializer):
+    """US-12: one low-stock threshold, with an optional expiring-soon override."""
+
+    minimum_units = serializers.IntegerField(
+        min_value=1,
+        error_messages={
+            "required": THRESHOLD_MESSAGE,
+            "null": THRESHOLD_MESSAGE,
+            "invalid": THRESHOLD_MESSAGE,
+            "min_value": THRESHOLD_MESSAGE,
+            "max_string_length": THRESHOLD_MESSAGE,
+        },
+    )
+    expiring_soon_days = serializers.IntegerField(
+        min_value=1,
+        required=False,
+        allow_null=True,
+        error_messages={"invalid": WINDOW_MESSAGE, "min_value": WINDOW_MESSAGE},
+    )
+
+    class Meta:
+        model = StockThreshold
+        fields = [
+            "id",
+            "blood_type",
+            "component",
+            "minimum_units",
+            "expiring_soon_days",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "updated_at"]
+        # Saving is an upsert by blood type and component, so skip the unique check.
+        validators = []
+
+    def validate(self, attrs):
+        # Same rule as the admin form and ShelfLifeRule.clean() (review feedback on #35).
+        shelf_life = (
+            ShelfLifeRule.objects.filter(component=attrs["component"])
+            .values_list("shelf_life_days", flat=True)
+            .first()
+        )
+        error = expiring_window_error(attrs.get("expiring_soon_days"), shelf_life)
+        if error:
+            raise serializers.ValidationError({"expiring_soon_days": [error]})
         return attrs

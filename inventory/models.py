@@ -1,19 +1,71 @@
 from datetime import timedelta
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
+from django.core.validators import MinValueValidator
 from django.db import models
-from django.db.models import Q
+from django.db.models import F, Q
 from django.utils import timezone
 
 from .choices import BloodType, Component
 
-
 # its a table, not a constatntm because medical rules live in tables by Sprint 2
+THRESHOLD_MESSAGE = "The low-stock threshold must be a positive whole number."
+WINDOW_MESSAGE = "The expiring-soon window must be a positive whole number of days."
+
+
+def expiring_window_error(days, shelf_life_days):
+
+    if days is None:
+        return None
+    if days < 1:
+        return WINDOW_MESSAGE
+    if shelf_life_days and days >= shelf_life_days:
+        return (
+            f"The expiring-soon window must be shorter than the {shelf_life_days}-day "
+            "shelf life of this component."
+        )
+    return None
+
+
 class ShelfLifeRule(models.Model):
     """Configured shelf life per component. Seeded by migration, not hard-coded."""
 
     component = models.CharField(max_length=10, choices=Component.choices, unique=True)
-    shelf_life_days = models.PositiveIntegerField()
+    shelf_life_days = models.PositiveIntegerField(validators=[MinValueValidator(1)])
+    # US-12: how many days before expiry a unit counts as "expiring soon". It follows
+    # the component's shelf life (seeded by migration) and a threshold can override it.
+    expiring_soon_days = models.PositiveIntegerField(
+        default=7, validators=[MinValueValidator(1, message=WINDOW_MESSAGE)]
+    )
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(expiring_soon_days__gte=1)
+                & Q(expiring_soon_days__lt=F("shelf_life_days")),
+                name="shelf_life_window_in_range",
+            ),
+        ]
+
+    def clean(self):
+        error = expiring_window_error(self.expiring_soon_days, self.shelf_life_days)
+        if error:
+            raise ValidationError({"expiring_soon_days": error})
+        # Shortening the shelf life must not leave blood-type windows that are too long.
+        too_long = StockThreshold.objects.filter(
+            component=self.component, expiring_soon_days__gte=self.shelf_life_days
+        ).order_by("blood_type")
+        if self.shelf_life_days and too_long.exists():
+            names = ", ".join(f"{t.blood_type} ({t.expiring_soon_days} days)" for t in too_long)
+            raise ValidationError(
+                {
+                    "shelf_life_days": (
+                        "These blood-type windows would be as long as the new shelf life; "
+                        f"shorten them first: {names}."
+                    )
+                }
+            )
 
     def __str__(self):
         return f"{self.component}: {self.shelf_life_days} days"
@@ -152,3 +204,50 @@ class CompatibilityRule(models.Model):
                 name="compatibility_unit_type_valid",
             ),
         ]
+
+
+class StockThreshold(models.Model):
+    """US-12: a coordinator-set low-stock alert level for one blood type and component."""
+
+    blood_type = models.CharField(max_length=3, choices=BloodType.choices)
+    component = models.CharField(max_length=10, choices=Component.choices)
+    minimum_units = models.PositiveIntegerField(
+        validators=[MinValueValidator(1, message=THRESHOLD_MESSAGE)]
+    )
+    # Optional override of the component's expiring-soon window; null = component default.
+    expiring_soon_days = models.PositiveIntegerField(
+        null=True, blank=True, validators=[MinValueValidator(1, message=WINDOW_MESSAGE)]
+    )
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, related_name="+"
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["component", "blood_type"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["blood_type", "component"], name="stock_threshold_unique"
+            ),
+            # AC5: the database also refuses a threshold that is not positive.
+            models.CheckConstraint(
+                condition=Q(minimum_units__gte=1), name="stock_threshold_positive"
+            ),
+            models.CheckConstraint(
+                condition=Q(expiring_soon_days__isnull=True) | Q(expiring_soon_days__gte=1),
+                name="stock_threshold_window_positive",
+            ),
+        ]
+
+    def clean(self):
+        shelf_life = (
+            ShelfLifeRule.objects.filter(component=self.component)
+            .values_list("shelf_life_days", flat=True)
+            .first()
+        )
+        error = expiring_window_error(self.expiring_soon_days, shelf_life)
+        if error:
+            raise ValidationError({"expiring_soon_days": error})
+
+    def __str__(self):
+        return f"{self.blood_type} {self.component}: alert below {self.minimum_units}"
