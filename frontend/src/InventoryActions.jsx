@@ -57,7 +57,7 @@ function Suggestions({ id }) {
 function History({ id }) {
   const resource = useResource(`/api/requests/${id}/history/`);
   return <><ResourceState resource={resource} />{resource.data && <Table rows={resource.data} empty="No request events recorded." columns={[
-    ["Time",e=>time(e.created_at)], ["Event",e=>title(e.event_type)], ["From",e=>title(e.from_status) || "—"], ["To",e=>title(e.to_status) || "—"], ["Coordinator",e=>e.actor_email],
+    ["Time",e=>time(e.created_at)], ["Event",e=>title(e.event_type)], ["From",e=>title(e.from_status) || "—"], ["To",e=>title(e.to_status) || "—"], ["Unit",e=>e.unit ? `${e.unit}${e.unit_code ? ` · ${e.unit_code}` : ""}` : "—"], ["Matched units",e=>(e.matched_unit_codes || []).join(", ") || "—"], ["Coordinator",e=>e.actor_name || e.actor_email],
   ]} />}</>;
 }
 export function RequestExtras({ request }) {
@@ -70,6 +70,7 @@ export function RequestExtras({ request }) {
     </div>{suggestions && <Suggestions key={version} id={request.id} />}</section>}
     <section className="panel"><div className="panel-title"><h2>Request activity</h2>
       <button className="secondary" onClick={()=>{setHistory(true);setVersion(v=>v+1);}}>View / refresh activity</button>
+      <Link to="/request-history">Open full request history</Link>
     </div>{history && <History key={version} id={request.id} />}</section>
   </>;
 }

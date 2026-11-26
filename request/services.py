@@ -139,6 +139,24 @@ def get_request_history(request_id):
     return repository.request_events(request_id)
 
 
+def list_request_history(*, logged_from=None, logged_to=None):
+    """US-20: every request logged in the range, oldest event first inside each request."""
+    return repository.requests_for_history(logged_from=logged_from, logged_to=logged_to)
+
+
+def record_match(request_id, units, coordinator):
+    """US-20: keep the units returned by a match, who ran it, and when."""
+    blood_request = repository.find_request(request_id)
+    if blood_request is None:
+        raise NotFound("Blood request not found.")
+    repository.create_request_event(
+        request=blood_request,
+        event_type=RequestEvent.EventType.MATCHED,
+        matched_unit_codes=[unit["unit_code"] for unit in units],
+        actor=coordinator,
+    )
+
+
 @transaction.atomic
 def reserve_units(request_id, unit_ids, coordinator):
     """US-16: hold the selected units for a request, all or nothing (Sprint 2 SQ-01).

@@ -20,6 +20,7 @@ import { DonorRegistry, DonorRecord } from "./DonorManagement";
 import { DiscardUnit, RequestExtras } from "./InventoryActions";
 import { StockAlerts } from "./StockAlerts";
 import { DonorOverview, DonorHistory, DonorContact } from "./DonorPortal";
+import { RequestHistory } from "./RequestHistory";
 const home = (user) => (user?.role === "coordinator" ? "/requests" : "/me");
 
 function Auth({ register, onSignIn, expired, withdrawn }) {
@@ -208,6 +209,9 @@ function Shell({ user, onSignOut, children }) {
             <>
               <NavLink to="/requests">
                 ▤ <span>Blood requests</span>
+              </NavLink>
+              <NavLink to="/request-history">
+                ◷ <span>Request history</span>
               </NavLink>
               <NavLink to="/donors">♡ <span>Donor registry</span></NavLink>
               <NavLink to="/inventory">
@@ -752,6 +756,7 @@ function Application() {
       <Route path="/donors" element={protect("coordinator", <DonorRegistry />)} />
       <Route path="/donors/:id" element={protect("coordinator", <DonorRecord />)} />
       <Route path="/requests" element={protect("coordinator", <Requests />)} />
+      <Route path="/request-history" element={protect("coordinator", <RequestHistory />)} />
       <Route
         path="/requests/:id"
         element={protect("coordinator", <DetailRoute />)}
