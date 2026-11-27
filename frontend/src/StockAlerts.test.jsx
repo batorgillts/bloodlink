@@ -24,6 +24,7 @@ const dashboard = {
 
 beforeEach(() => {
   localStorage.clear();
+  window.history.replaceState({}, "", "/login");
   HTMLDialogElement.prototype.showModal = function () { this.open = true; };
   HTMLDialogElement.prototype.close = function () { this.open = false; };
 });
@@ -95,7 +96,7 @@ test("AC5: the server's validation message is shown", async () => {
   expect(await screen.findByText(/The low-stock threshold must be a positive whole number/)).toBeInTheDocument();
 });
 
-test("AC4: the inventory page reloads the dashboard after a unit is discarded", async () => {
+test("alerts have a separate coordinator page and refresh after inventory changes", async () => {
   localStorage.setItem("access", "test-access");
   localStorage.setItem("bloodlink-user", JSON.stringify({ email: "demo@example.com", role: "coordinator" }));
   window.history.replaceState({}, "", "/inventory");
@@ -104,16 +105,53 @@ test("AC4: the inventory page reloads the dashboard after a unit is discarded", 
     if (url.endsWith("/discard/")) { discarded = true; return response({}); }
     if (url.endsWith("/inventory/dashboard/"))
       return response(discarded ? { ...dashboard, expiring_soon: dashboard.expiring_soon.map((g) => ({ ...g, units: [] })) } : dashboard);
-    return response([{ id: 1, unit_code: "RBC-SOON", blood_type: "O-", component: "RBC", status: discarded ? "discarded" : "available", can_discard: !discarded }]);
+    return response([{ id: 1, unit_code: "RBC-SOON", blood_type: "O-", component: "RBC", status: discarded ? "discarded" : "available", can_discard: !discarded, discard_reason: discarded ? "damaged" : "" }]);
   });
   vi.stubGlobal("fetch", fetch);
   render(<App />);
+  await screen.findByRole("button", { name: "Discard RBC-SOON" });
+  expect(screen.getByLabelText("Search inventory")).toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "Low-stock alerts" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Alert settings" })).not.toBeInTheDocument();
+  expect(fetch.mock.calls.some(([url]) => url.endsWith("/inventory/dashboard/"))).toBe(false);
+  const navigation = within(screen.getByRole("navigation", { name: "Main navigation" }));
+  expect(navigation.getByRole("link", { name: /Blood inventory/ })).toHaveAttribute("aria-current", "page");
+  expect(navigation.getByRole("link", { name: /Inventory alerts/ })).toHaveAttribute("href", "/inventory-alerts");
+
+  fireEvent.click(navigation.getByRole("link", { name: /Inventory alerts/ }));
+  expect(await screen.findByRole("heading", { name: "Inventory alerts", level: 1 })).toBeInTheDocument();
   const rbcHeading = await screen.findByRole("heading", { name: /Red blood cells \(within 7 days by default\)/ });
   expect(within(rbcHeading.parentElement).getByText("RBC-SOON")).toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: "Discard RBC-SOON" }));
+  expect(screen.queryByLabelText("Search inventory")).not.toBeInTheDocument();
+  expect(navigation.getByRole("link", { name: /Inventory alerts/ })).toHaveAttribute("aria-current", "page");
+  expect(navigation.getByRole("link", { name: /Blood inventory/ })).not.toHaveAttribute("aria-current");
+
+  fireEvent.click(navigation.getByRole("link", { name: /Blood inventory/ }));
+  fireEvent.click(await screen.findByRole("button", { name: "Discard RBC-SOON" }));
   fireEvent.change(screen.getByLabelText("Discard reason"), { target: { value: "damaged" } });
   fireEvent.click(screen.getByRole("button", { name: "Discard unit", exact: true }));
-  await waitFor(() => expect(screen.getByText("No red blood cells expiring soon.")).toBeInTheDocument());
+  await screen.findByText("Unit discarded. Any affected request has been updated.");
+  await waitFor(() => expect(screen.queryByRole("button", { name: "Discard RBC-SOON" })).not.toBeInTheDocument());
+
+  fireEvent.click(navigation.getByRole("link", { name: /Inventory alerts/ }));
+  expect(await screen.findByText("No red blood cells expiring soon.")).toBeInTheDocument();
+  expect(fetch.mock.calls.filter(([url]) => url.endsWith("/inventory/dashboard/")).length).toBe(2);
+});
+
+test.each(["donor", "anonymous"])("%s cannot load the inventory alerts page", async (role) => {
+  if (role === "donor") {
+    localStorage.setItem("access", "test-access");
+    localStorage.setItem("bloodlink-user", JSON.stringify({ email: "demo@example.com", role }));
+  }
+  window.history.replaceState({}, "", "/inventory-alerts");
+  const fetch = vi.fn();
+  vi.stubGlobal("fetch", fetch);
+  render(<App />);
+  expect(await screen.findByRole("heading", {
+    name: role === "donor" ? "You do not have access" : "Sign in to BloodLink",
+  })).toBeInTheDocument();
+  expect(screen.queryByRole("link", { name: /Inventory alerts/ })).not.toBeInTheDocument();
+  expect(fetch).not.toHaveBeenCalled();
 });
 
 test("review: a blood type's own window is shown, not just the default", async () => {

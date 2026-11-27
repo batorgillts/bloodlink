@@ -1,5 +1,10 @@
 from django.urls import path
 
+from .appointment_views import (
+    MyAppointmentCancelView,
+    MyAppointmentDetailView,
+    MyAppointmentListView,
+)
 from .views import (
     DonationCreateView,
     DonationDeleteView,
@@ -12,6 +17,17 @@ from .views import (
 )
 
 urlpatterns = [
+    path("me/appointments/", MyAppointmentListView.as_view(), name="my-appointments"),
+    path(
+        "me/appointments/<int:appointment_id>/",
+        MyAppointmentDetailView.as_view(),
+        name="my-appointment-detail",
+    ),
+    path(
+        "me/appointments/<int:appointment_id>/cancel/",
+        MyAppointmentCancelView.as_view(),
+        name="my-appointment-cancel",
+    ),
     path("me/profile/", DonorProfileView.as_view(), name="my-profile"),
     path("", DonorRecordListCreateView.as_view(), name="donor-record-list-create"),
     path("<int:donor_id>/", DonorRecordDetailView.as_view(), name="donor-record-detail"),

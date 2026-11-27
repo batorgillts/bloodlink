@@ -97,24 +97,21 @@ class BloodRequestHistoryView(APIView):
 
 
 class BloodRequestHistoryListView(APIView):
-    """US-20: audit log of requests, optionally limited to a logged-date range."""
+    """US-20: audit log filtered by request details and logged-date range."""
 
     permission_classes = [IsAuthenticated, IsCoordinator]
 
     def get(self, request):
         params = RequestHistoryQuerySerializer(data=request.query_params)
         params.is_valid(raise_exception=True)
-        logged_from = params.validated_data.get("logged_from")
-        logged_to = params.validated_data.get("logged_to")
-        records = list(
-            services.list_request_history(
-                logged_from=logged_from,
-                logged_to=logged_to,
-            )
-        )
+        filters = params.validated_data
+        records = list(services.list_request_history(**filters))
         message = ""
-        if logged_from and logged_to and not records:
-            message = "No requests found for this period"
+        if not records:
+            if any(field in filters for field in ("blood_type", "component", "quantity")):
+                message = "No requests match these filters."
+            elif "logged_from" in filters:
+                message = "No requests found for this period"
         return Response(
             {
                 "requests": RequestAuditSerializer(records, many=True).data,

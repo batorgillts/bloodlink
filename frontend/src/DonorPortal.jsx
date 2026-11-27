@@ -4,15 +4,17 @@ import { api } from "./api/client";
 import { Form, Badge, Header, Notice, ResourceState, Table } from "./ui";
 import { COMPONENTS, date, title, useResource } from "./viewHelpers";
 import { WithdrawRegistration } from "./InventoryActions";
+import { AppointmentForm } from "./DonorAppointments";
 import "./donor.css";
 
 const recordCode = (id) => `DN-${String(id).padStart(4, "0")}`;
 
-function Identity({ profile }) {
+function Identity({ profile, onBook }) {
   return <div className="donor-identity">
     <strong>{profile.full_name}</strong>
     <span className="blood-type">{profile.blood_type}</span>
     <span className="muted">Your account only</span>
+    {onBook && <button className="donor-booking-button" onClick={onBook}>Book a donation</button>}
   </div>;
 }
 
@@ -65,13 +67,16 @@ function Eligibility({ rows }) {
 }
 
 export function DonorOverview() {
+  const [booking, setBooking] = useState(false);
+  const [booked, setBooked] = useState(false);
   const profile = useResource("/api/donors/me/profile/");
   const resource = useResource("/api/donors/me/eligibility/", {refreshInterval: 10000});
   const data = resource.data;
   return <div className="donor-page">
     <Header title="Your donation overview">Review your eligibility and recent donation activity.</Header>
     <ResourceState resource={profile} />
-    {profile.data && <Identity profile={profile.data} />}
+    {profile.data && <Identity profile={profile.data} onBook={() => setBooking(true)} />}
+    {booked && <Notice>Appointment booked. <Link to="/me/appointments">View your appointments</Link></Notice>}
     <ResourceState resource={resource} />
     {data && <>
       {data.no_donation_history && <section className="donor-welcome">
@@ -95,6 +100,9 @@ export function DonorOverview() {
       </section>
       <div className="donor-quick-links"><Link to="/me/history">View donation history</Link><Link to="/me/contact">Update contact information</Link></div>
     </>}
+    {booking && <AppointmentForm onClose={() => setBooking(false)} onSaved={() => {
+      setBooking(false); setBooked(true);
+    }} />}
   </div>;
 }
 

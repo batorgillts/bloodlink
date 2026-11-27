@@ -102,3 +102,92 @@ class Donation(models.Model):
 
     def __str__(self):
         return f"{self.donor_id} {self.donation_type_id} {self.donation_date}"
+
+
+class DonationAppointment(models.Model):
+    """A donor's booking, separate from a donation actually recorded by the bank."""
+
+    class Status(models.TextChoices):
+        SCHEDULED = "scheduled", "Scheduled"
+        IN_PROGRESS = "in_progress", "In progress"
+        CANCELLED = "cancelled", "Cancelled"
+        COMPLETED = "completed", "Completed"
+
+    class CancellationReason(models.TextChoices):
+        DONOR = "donor", "Cancelled by donor"
+        COORDINATOR = "coordinator", "Cancelled by coordinator"
+        EXPIRED = "expired", "Appointment time passed"
+        ACCOUNT_INACTIVE = "account_inactive", "Donor account deactivated"
+
+    donor = models.ForeignKey(Donor, on_delete=models.PROTECT, related_name="appointments")
+    donation_type = models.ForeignKey(
+        DonationIntervalRule,
+        to_field="donation_type",
+        db_column="donation_type",
+        on_delete=models.PROTECT,
+        related_name="appointments",
+    )
+    scheduled_at = models.DateTimeField()
+    status = models.CharField(max_length=12, choices=Status.choices, default=Status.SCHEDULED)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+    cancellation_reason = models.CharField(
+        max_length=20, choices=CancellationReason.choices, blank=True, default=""
+    )
+    cancelled_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True,
+        related_name="cancelled_donation_appointments",
+    )
+    completed_at = models.DateTimeField(null=True, blank=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    started_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True,
+        related_name="started_donation_appointments",
+    )
+    donation = models.OneToOneField(
+        Donation, on_delete=models.PROTECT, null=True, blank=True, related_name="appointment"
+    )
+    unit = models.OneToOneField(
+        "inventory.BloodUnit", on_delete=models.PROTECT, null=True, blank=True,
+        related_name="appointment",
+    )
+
+    class Meta:
+        ordering = ["scheduled_at", "id"]
+        indexes = [
+            models.Index(
+                fields=["donor", "status", "scheduled_at"], name="appointment_donor_status"
+            ),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(status__in=["scheduled", "in_progress", "cancelled", "completed"]),
+                name="appointment_status_valid",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    Q(status__in=["scheduled", "in_progress", "completed"],
+                      cancelled_at__isnull=True)
+                    | Q(status="cancelled", cancelled_at__isnull=False)
+                ),
+                name="appointment_cancel_stamp_valid",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    Q(status="completed", donation__isnull=False, unit__isnull=False,
+                      completed_at__isnull=False)
+                    | (~Q(status="completed") & Q(donation__isnull=True, unit__isnull=True,
+                                                 completed_at__isnull=True))
+                ),
+                name="appointment_completion_valid",
+            ),
+            models.UniqueConstraint(
+                fields=["donor", "scheduled_at"],
+                condition=Q(status__in=["scheduled", "in_progress"]),
+                name="appointment_donor_time_unique",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.donor_id} {self.donation_type_id} {self.scheduled_at}"

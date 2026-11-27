@@ -126,6 +126,98 @@ class RequestHistoryTests(TestCase):
         self.assertEqual(response.data["requests"], [])
         self.assertEqual(response.data["message"], "No requests found for this period")
 
+    def test_request_details_can_be_filtered_independently(self):
+        original = self.log_request()
+        other_type = self.log_request(blood_type="A-")
+        other_component = self.log_request(component="PLASMA")
+        other_quantity = self.log_request(quantity=3)
+        cases = (
+            ({"blood_type": "A+"}, [original, other_component, other_quantity]),
+            ({"component": "RBC"}, [original, other_type, other_quantity]),
+            ({"quantity": 2}, [original, other_type, other_component]),
+            ({}, [original, other_type, other_component, other_quantity]),
+        )
+
+        for filters, expected in cases:
+            with self.subTest(filters=filters):
+                response = self.client.get(LIST_URL, filters)
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.data["message"], "")
+                self.assertCountEqual(
+                    [row["id"] for row in response.data["requests"]],
+                    [record.pk for record in expected],
+                )
+
+    def test_request_details_and_inclusive_dates_are_combined(self):
+        first = self.log_request()
+        last = self.log_request()
+        self.stamp(first, timezone.make_aware(datetime(2026, 11, 1, 0, 0)))
+        self.stamp(last, timezone.make_aware(datetime(2026, 11, 30, 23, 59)))
+        for overrides in (
+            {"blood_type": "A-"},
+            {"component": "PLASMA"},
+            {"quantity": 3},
+        ):
+            nonmatching = self.log_request(**overrides)
+            self.stamp(nonmatching, timezone.make_aware(datetime(2026, 11, 15, 12, 0)))
+        outside = self.log_request()
+        self.stamp(outside, timezone.make_aware(datetime(2026, 12, 1, 0, 0)))
+
+        response = self.client.get(
+            LIST_URL,
+            {
+                "blood_type": "A+",
+                "component": "RBC",
+                "quantity": 2,
+                "logged_from": "2026-11-01",
+                "logged_to": "2026-11-30",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertCountEqual(
+            [row["id"] for row in response.data["requests"]], [first.pk, last.pk]
+        )
+
+    def test_invalid_request_detail_filters_are_rejected(self):
+        cases = (
+            {"blood_type": "A"},
+            {"component": "WHOLE_BLOOD"},
+            {"quantity": "0"},
+            {"quantity": "-1"},
+            {"quantity": "1.5"},
+            {"quantity": "two"},
+        )
+        for filters in cases:
+            with self.subTest(filters=filters):
+                response = self.client.get(LIST_URL, filters)
+                self.assertEqual(response.status_code, 400)
+                self.assertIn(next(iter(filters)), response.data)
+
+    def test_empty_detail_filters_use_the_filters_message(self):
+        blood_request = self.log_request()
+        self.stamp(blood_request, timezone.make_aware(datetime(2026, 11, 2, 15, 0)))
+        cases = (
+            {"blood_type": "O-"},
+            {"component": "PLATELETS"},
+            {"quantity": 99},
+            {
+                "blood_type": "A+",
+                "logged_from": "2025-01-01",
+                "logged_to": "2025-01-31",
+            },
+        )
+        for filters in cases:
+            with self.subTest(filters=filters):
+                response = self.client.get(LIST_URL, filters)
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.data["requests"], [])
+                self.assertEqual(response.data["message"], "No requests match these filters.")
+
+    def test_empty_history_without_filters_has_no_filter_message(self):
+        response = self.client.get(LIST_URL)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data, {"requests": [], "message": ""})
+
     def test_invalid_date_range_is_rejected(self):
         reversed_range = self.client.get(
             LIST_URL, {"logged_from": "2026-12-01", "logged_to": "2026-11-01"}

@@ -127,7 +127,7 @@ function UnitForm({ donorId, initialDonation, busy, setBusy, onClose, onCreated 
       </div>
       <Field key={`${mode}-${donationId}`} label="Collection date and time (your local time)" name="collected_at" type="datetime-local"
         defaultValue={mode === "new" ? localDateTimeInput() : ""} required />
-      <p className="hint">The donation date uses the collection date in America/New_York. For an existing donation, these dates must match.</p>
+      <p className="hint">The donation date uses the collection date. For an existing donation, these dates must match.</p>
       <div className="actions">
         <button className="secondary" type="button" onClick={onClose}>Cancel</button>
         <button type="submit" disabled={mode === "existing" && !donation}>{busy ? "Saving…" : "Record unit"}</button>

@@ -1,0 +1,49 @@
+.coordinator-booking-filters { display: grid; grid-template-columns: minmax(0, 1fr); }
+.coordinator-booking-filter-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) auto; align-items: end; gap: 1rem; }
+.coordinator-booking-filter-row > .field-control { min-width: 0; }
+.coordinator-booking-filter-row select,
+.coordinator-booking-filter-row > button { height: 3rem; }
+.coordinator-booking-list { list-style: none; margin: 0; padding: 0; }
+.coordinator-booking-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+  gap: 1.2rem 1.5rem;
+  padding: 1.5rem;
+  border-top: 1px solid var(--color-border);
+}
+.coordinator-booking-identity { min-width: 0; overflow-wrap: anywhere; }
+.coordinator-booking-identity h3 { margin: 0; font-size: 1rem; }
+.coordinator-booking-identity p { margin: 0.35rem 0; }
+.coordinator-booking-identity > span { font-size: var(--text-sm); }
+.coordinator-booking-details { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.6rem 1rem; margin: 0; }
+.coordinator-booking-details > div:first-child { grid-column: 1 / -1; }
+.coordinator-booking-details dt,
+.coordinator-booking-donor dt { color: var(--color-muted); font-size: var(--text-sm); }
+.coordinator-booking-details dd,
+.coordinator-booking-donor dd { margin: 0.25rem 0 0; font-weight: 700; overflow-wrap: anywhere; }
+.coordinator-booking-controls { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; }
+.coordinator-booking-controls .badge.scheduled { color: var(--color-primary); }
+.coordinator-booking-controls .badge.in_progress { color: var(--color-info); }
+.coordinator-booking-controls .badge.completed { color: var(--color-ok); }
+.coordinator-booking-row-actions,
+.coordinator-booking-actions { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+.coordinator-booking-actions { justify-content: flex-end; }
+.coordinator-booking-outcome { grid-column: 1 / -1; margin: 0; font-size: var(--text-sm); color: var(--color-muted); overflow-wrap: anywhere; }
+.coordinator-booking-donor { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; padding: 1rem; margin: 0 0 1.5rem; border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-page); }
+.coordinator-booking-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; align-items: start; }
+.coordinator-booking-fields .field-hint,
+.coordinator-booking-fields .field-error { margin: 0.4rem 0 0; }
+.coordinator-booking-note { color: var(--color-muted); font-size: var(--text-sm); margin: 0; }
+@media (max-width: 900px) {
+  .coordinator-booking-filter-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 700px) {
+  .coordinator-booking-filter-row,
+  .coordinator-booking-card,
+  .coordinator-booking-donor,
+  .coordinator-booking-fields { grid-template-columns: minmax(0, 1fr); }
+  .coordinator-booking-card { padding: 1.2rem; }
+  .coordinator-booking-row-actions { width: 100%; }
+  .coordinator-booking-row-actions > button,
+  .coordinator-booking-actions > button { flex: 1 1 100%; }
+}

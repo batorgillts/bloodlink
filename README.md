@@ -68,7 +68,7 @@ into `develop` or `main`. Frontend checks are `npm run lint`, `npm test`, and
 ## Frontend
 
 The React app in `frontend/` uses the Django API. It covers donor registration,
-sign-in, contact, eligibility, and withdrawal, plus coordinator donor records,
+sign-in, contact, eligibility, appointments, and withdrawal, plus coordinator donor records,
 donation entry and deletion, inventory, requests, component matching, reservation,
 cancellation, donor suggestions, and per-request activity. Use synthetic data only.
 
@@ -142,6 +142,13 @@ and cannot be used to edit it. Donation history includes a `recorded_by` name, o
 | POST | `/api/auth/token/` (`email`, `password`) | Sign in (US-02, US-06). Email is case-insensitive. Returns `access`, `refresh`, `email` and `role`. 400 if a field is missing, 401 for wrong credentials or a deactivated account | Anyone |
 | POST | `/api/auth/token/refresh/` (`refresh`) | Get a new access token | Anyone |
 | GET | `/api/donors/me/profile/` | Read own name, blood type, status, email and phone for the donor portal; read-only | Signed-in active donor |
+| GET / POST | `/api/donors/me/appointments/` | List own appointments or book one with `donation_type`, `appointment_date` (`YYYY-MM-DD`) and `appointment_time` (`HH:mm`, America/New_York). Returns an array for GET and the saved appointment for POST | Signed-in active donor |
+| GET / PATCH | `/api/donors/me/appointments/<id>/` | View or change an own future scheduled appointment. PATCH accepts only donation type, date and time and rechecks eligibility. Other donors' IDs return 404 | Owning active donor only |
+| POST | `/api/donors/me/appointments/<id>/cancel/` (`confirm: true`) | Cancel an own future appointment while retaining its history. Repeated cancellation is safe. Past appointments cannot be changed or cancelled | Owning active donor only |
+| GET | `/api/appointments/` | List appointments with optional `search` (each word partially matches donor name or email), `donation_type`, `blood_type`, and `status` filters combined with AND. Returns `appointments`, configured `donation_types` with `allowed_components`, `timezone`, and `as_of` | Coordinator |
+| POST | `/api/appointments/<id>/start/` (`{}`) | Begin recording a scheduled appointment, including one whose scheduled time has passed. Sets `in_progress`; repeated calls resume the same record. Closing the form leaves it in progress | Coordinator |
+| POST | `/api/appointments/<id>/record/` | Complete an in-progress appointment with `unit_code`, `volume_ml`, `component`, `collected_date` (`YYYY-MM-DD`), and `collected_time` (`HH:mm`, America/New_York). The server locks donor identity, blood type and donation type to the appointment, creates a new Donation and BloodUnit atomically, and returns `{appointment, unit}`. Existing donations cannot be selected and duplicate completion is rejected | Coordinator |
+| POST | `/api/appointments/<id>/cancel/` (`confirm: true`) | Cancel a scheduled or in-progress appointment. Completed appointments cannot be cancelled. Cancellation retains its reason, timestamp and actor | Coordinator |
 | GET / PATCH | `/api/donors/me/contact/` (`email` and/or `phone` for PATCH) | View or update own contact information (US-03) | Signed-in active donor |
 | GET / PATCH | `/api/donors/<donor_id>/contact/` | Same operation by donor profile ID; any other ID returns 403 | Owning active donor only |
 | GET | `/api/donors/?name=&email=&blood_type=` | Search donor records (US-08) | Coordinator |
@@ -164,11 +171,35 @@ and cannot be used to edit it. Donation history includes a `recorded_by` name, o
 | GET | `/api/requests/<request_id>/donor-suggestions/` | List active donors whose blood type is compatible under the component's rules and who are eligible today for the matching donation type (red cells: whole blood, plasma: plasma, platelets: platelets). Shows name, blood type, last donation date, email and phone, identical type first. Empty list returns `No eligible donors found.`; 409 for a fulfilled or cancelled request (US-18) | Coordinator |
 | POST | `/api/requests/<request_id>/cancel/` (`confirm: true`) | Cancel a pending or partially fulfilled request and release its reserved units (US-19); expired units remain expired | Coordinator |
 | GET | `/api/requests/<request_id>/history/` | View a request's event history, including cancellation time and coordinator (US-19). Each match, reservation and status change is included (US-20). PUT, PATCH and DELETE are rejected | Coordinator |
-| GET | `/api/requests/history/?logged_from=&logged_to=` | Audit log of every request: blood type, component, quantity, logged time, coordinator, and events. Both dates are inclusive (`YYYY-MM-DD`) and must be sent together. An empty range returns `No requests found for this period` (US-20) | Coordinator |
+| GET | `/api/requests/history/` | Request audit log with optional `blood_type`, `component`, `quantity`, `logged_from`, and `logged_to` query parameters, combined with AND. Quantity is an exact positive-integer match. Both dates are inclusive (`YYYY-MM-DD`) and must be sent together. Empty results return `No requests match these filters.` when filtering request details, or `No requests found for this period` for dates alone (US-20) | Coordinator |
 | POST | `/api/requests/<id>/reserve/` (`unit_ids`) | Reserve selected compatible units in one transaction; request becomes `partially_fulfilled` or `fulfilled` (US-16). 400 if too many or incompatible units, 409 if a unit is no longer available or the request is closed, 404 if not found | Coordinator |
 
 Protected endpoints require `Authorization: Bearer <access token>`.
 Without it they return 401. A signed-in donor calling a coordinator-only endpoint gets 403.
+
+Appointment dates and times use the blood bank's `America/New_York` time zone.
+Booking and rescheduling require a future time on or after the selected donation type's
+earliest eligible date, calculated from recorded donations and configured interval rules.
+Upcoming appointments of the same type must also respect that interval; appointments
+cannot share a time. Cancelled bookings do not affect these checks; in-progress bookings
+continue to reserve their interval until recorded or cancelled.
+Times skipped or repeated by daylight-saving clock changes are rejected rather than shifted.
+Appointments do not create donation records or change current eligibility. Returned records
+include `scheduled_at`, the bank-local date/time, `timezone`, `status`, `can_modify`, and
+creation/update/cancellation timestamps. Withdrawing or deactivating an account cancels
+all its unfinished appointments, including past scheduled and in-progress appointments.
+Donors cannot edit or cancel an appointment
+once a coordinator has started it. Recording uses the same component, collection-time,
+unit-code uniqueness and donation-interval validation as the normal inventory form.
+Only a successful recording changes current donation history and eligibility.
+
+Appointment states are `scheduled`, `in_progress`, `completed`, and `cancelled`.
+Passing the scheduled time does not change the appointment's state. Coordinators can
+start, record or manually cancel overdue appointments. Donor-created appointments and
+rescheduled dates must still be in the future, and actual blood collection times cannot
+be in the future. Cancellation reasons are `donor`, `coordinator`, and `account_inactive`;
+historical records may retain `expired` or a blank reason. Start, record and cancel share
+the same donor/appointment lock order, and a failed recording rolls back all its changes.
 
 US-03 returns 400 for invalid contact input, 403 for non-owner/coordinator access,
 404 when the signed-in donor has no profile, and 409 for an email already in use.

@@ -178,12 +178,19 @@ fieldset {
 }
 .sidebar nav a {
   display: flex;
+  align-items: center;
   gap: 0.7rem;
   padding: 0.8rem;
   border-radius: 8px;
   color: var(--color-muted);
   font-size: 0.9rem;
   text-decoration: none;
+}
+.sidebar .nav-icon {
+  display: block;
+  width: 1.25rem;
+  height: 1.25rem;
+  flex: 0 0 1.25rem;
 }
 .sidebar nav a.active {
   background: var(--color-tint);
@@ -350,6 +357,21 @@ tbody tr:hover {
   align-items: end;
   flex-wrap: wrap;
 }
+.inventory-unit-actions {
+  display: grid;
+  grid-template-columns: repeat(2, 5.5rem);
+  align-items: center;
+  gap: 0.5rem;
+}
+.inventory-unit-actions > button {
+  grid-row: 1;
+  min-height: var(--tap-target);
+  padding: 0.65rem 0.75rem;
+  white-space: nowrap;
+}
+.inventory-edit { grid-column: 1; }
+.inventory-discard { grid-column: 2; }
+.inventory-discarded { grid-column: 1 / -1; }
 .donor-search { margin: 1.2rem 0; min-width: 0; }
 .donor-search > label { margin-bottom: 0.4rem; }
 .donor-search > input { width: 100%; }
@@ -640,6 +662,50 @@ footer {
 .field-control .field-hint, .field-control .field-error { margin: 0.4rem 0 0; }
 .field select[aria-invalid='true'] { border-color: var(--color-danger); }
 
+.request-history-filters { display: block; }
+.request-history-type-filters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+.request-history-filter-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
+  column-gap: 1rem;
+}
+/* Share label, control, hint and error rows so messages never shift the button. */
+.request-history-filter-row > .field-control {
+  display: grid;
+  grid-template-rows: subgrid;
+  grid-row: 1 / span 4;
+  min-width: 0;
+}
+.request-history-filter-row .field {
+  grid-template-rows: subgrid;
+  grid-row: 1 / span 2;
+  gap: 0;
+}
+.request-history-filter-row .field input,
+.request-history-filter-row > button { margin-top: 0.4rem; }
+.request-history-filter-row > button {
+  grid-column: 3;
+  grid-row: 2;
+  align-self: stretch;
+}
+@media (max-width: 900px) {
+  .request-history-type-filters { grid-template-columns: minmax(0, 1fr); }
+  .request-history-filter-row {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  .request-history-filter-row > .field-control { display: block; width: 100%; }
+  .request-history-filter-row .field { grid-template-rows: none; gap: 0.4rem; }
+  .request-history-filter-row .field input,
+  .request-history-filter-row > button { margin-top: 0; }
+}
+
 .request-history-note {
   margin: 0 0 var(--space-3);
   color: var(--color-muted);
@@ -680,13 +746,14 @@ footer {
 /* US-12 inventory dashboard */
 .stock-alerts {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-4);
-  padding: 0 1.5rem 1.5rem;
+  padding: 1.5rem;
 }
-.stock-alerts h3 {
+.stock-alerts h2 {
   margin: 0 0 var(--space-2);
 }
-.expiry-group h4 {
+.expiry-group h3 {
   margin: var(--space-3) 0 var(--space-2);
 }
 .alert-list {

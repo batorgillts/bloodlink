@@ -139,9 +139,17 @@ def get_request_history(request_id):
     return repository.request_events(request_id)
 
 
-def list_request_history(*, logged_from=None, logged_to=None):
-    """US-20: every request logged in the range, oldest event first inside each request."""
-    return repository.requests_for_history(logged_from=logged_from, logged_to=logged_to)
+def list_request_history(
+    *, logged_from=None, logged_to=None, blood_type=None, component=None, quantity=None
+):
+    """US-20: filtered requests, oldest event first inside each request."""
+    return repository.requests_for_history(
+        logged_from=logged_from,
+        logged_to=logged_to,
+        blood_type=blood_type,
+        component=component,
+        quantity=quantity,
+    )
 
 
 def record_match(request_id, units, coordinator):
