@@ -11,14 +11,15 @@ from accounts.permissions import IsCoordinator
 from config.exceptions import Conflict
 from config.search import filter_text
 
-from . import services
+from . import alerts, services
 from .choices import BloodType, Component
-from .models import BloodUnit
+from .models import BloodUnit, StockThreshold
 from .serializers import (
     BloodUnitSerializer,
     BloodUnitUpdateSerializer,
     DiscardUnitSerializer,
     InventorySearchParamsSerializer,
+    StockThresholdSerializer,
 )
 
 FILTERS = {
@@ -120,3 +121,30 @@ class BloodUnitDiscard(APIView):
                 ),
             }
         )
+
+
+class StockThresholdView(APIView):
+    """US-12: list thresholds, or set/adjust one per blood type and component (PUT)."""
+
+    permission_classes = [IsAuthenticated, IsCoordinator]
+
+    def get(self, request):
+        return Response(StockThresholdSerializer(StockThreshold.objects.all(), many=True).data)
+
+    def put(self, request):
+        data = StockThresholdSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        threshold, created = alerts.save_threshold(coordinator=request.user, **data.validated_data)
+        return Response(
+            StockThresholdSerializer(threshold).data,
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
+
+class InventoryDashboardView(APIView):
+    """US-12: low-stock alerts, the expiring-soon report and stock per type and component."""
+
+    permission_classes = [IsAuthenticated, IsCoordinator]
+
+    def get(self, request):
+        return Response(alerts.build_dashboard())

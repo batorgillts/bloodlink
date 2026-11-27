@@ -87,6 +87,21 @@ def request_events(request_id):
     return RequestEvent.objects.filter(request_id=request_id).select_related("actor", "unit")
 
 
+def requests_for_history(*, logged_from=None, logged_to=None):
+    """US-20: requests logged in an inclusive date range, with their events."""
+    requests = BloodRequest.objects.select_related("logged_by").prefetch_related(
+        Prefetch(
+            "events",
+            queryset=RequestEvent.objects.select_related("actor", "unit"),
+        )
+    )
+    if logged_from is not None:
+        requests = requests.filter(logged_at__date__gte=logged_from)
+    if logged_to is not None:
+        requests = requests.filter(logged_at__date__lte=logged_to)
+    return requests
+
+
 def find_matching_request(request_id):
     return BloodRequest.objects.filter(pk=request_id).first()
 

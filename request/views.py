@@ -11,9 +11,19 @@ from .serializers import (
     BloodRequestSerializer,
     ConfirmCancelSerializer,
     MatchedUnitSerializer,
+    RequestAuditSerializer,
     RequestEventSerializer,
+    RequestHistoryQuerySerializer,
     ReserveUnitsSerializer,
 )
+
+
+def reject_history_change():
+    """US-20: a stored history entry cannot be edited or deleted."""
+    return Response(
+        {"detail": "Request history cannot be edited or deleted."},
+        status=status.HTTP_405_METHOD_NOT_ALLOWED,
+    )
 
 
 class BloodRequestListCreateView(APIView):
@@ -76,6 +86,51 @@ class BloodRequestHistoryView(APIView):
         events = services.get_request_history(request_id)
         return Response(RequestEventSerializer(events, many=True).data)
 
+    def put(self, request, request_id):
+        return reject_history_change()
+
+    def patch(self, request, request_id):
+        return reject_history_change()
+
+    def delete(self, request, request_id):
+        return reject_history_change()
+
+
+class BloodRequestHistoryListView(APIView):
+    """US-20: audit log of requests, optionally limited to a logged-date range."""
+
+    permission_classes = [IsAuthenticated, IsCoordinator]
+
+    def get(self, request):
+        params = RequestHistoryQuerySerializer(data=request.query_params)
+        params.is_valid(raise_exception=True)
+        logged_from = params.validated_data.get("logged_from")
+        logged_to = params.validated_data.get("logged_to")
+        records = list(
+            services.list_request_history(
+                logged_from=logged_from,
+                logged_to=logged_to,
+            )
+        )
+        message = ""
+        if logged_from and logged_to and not records:
+            message = "No requests found for this period"
+        return Response(
+            {
+                "requests": RequestAuditSerializer(records, many=True).data,
+                "message": message,
+            }
+        )
+
+    def put(self, request):
+        return reject_history_change()
+
+    def patch(self, request):
+        return reject_history_change()
+
+    def delete(self, request):
+        return reject_history_change()
+
 
 class BloodRequestMatchView(APIView):
     """Suggest compatible units without reserving or changing inventory."""
@@ -84,6 +139,7 @@ class BloodRequestMatchView(APIView):
 
     def get(self, request, request_id):
         units = MatchedUnitSerializer(matching.match_blood_request(request_id), many=True).data
+        services.record_match(request_id, units, request.user)
         return Response(
             {
                 "request_id": request_id,
