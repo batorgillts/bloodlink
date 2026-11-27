@@ -33,18 +33,20 @@ def _linear_regression_forecast(values):
 
 
 def weekly_demand_forecast():
-    """Return next-week forecasts and their weekly history by blood type/component."""
+    """Forecast the current week from completed weekly history by blood type/component."""
     today = timezone.localdate()
     current_week = _week_start(today)
-    first_week = current_week - timedelta(weeks=HISTORY_WEEKS - 1)
-    next_week = current_week + timedelta(weeks=1)
+    # The current week is still in progress. Forecast it from the completed
+    # weeks before it, so the training horizon and returned dates stay aligned.
+    last_completed_week = current_week - timedelta(weeks=1)
+    first_week = current_week - timedelta(weeks=HISTORY_WEEKS)
 
     # Every status except cancelled is demand, including pending, partial and fulfilled.
     weekly_totals = {}
     requests = BloodRequest.objects.exclude(status=BloodRequest.Status.CANCELLED)
     records = requests.filter(
         logged_at__date__gte=first_week,
-        logged_at__date__lt=next_week,
+        logged_at__date__lt=current_week,
     ).values_list("blood_type", "component", "quantity", "logged_at")
     for blood_type, component, quantity, logged_at in records.iterator():
         week = _week_start(timezone.localtime(logged_at).date())
@@ -52,7 +54,7 @@ def weekly_demand_forecast():
         weekly_totals[key] = weekly_totals.get(key, 0) + quantity
 
     earliest_request = (
-        BloodRequest.objects.order_by("logged_at").values_list("logged_at", flat=True).first()
+        requests.order_by("logged_at").values_list("logged_at", flat=True).first()
     )
     if earliest_request is None:
         coverage_start_week = None
@@ -62,7 +64,10 @@ def weekly_demand_forecast():
         coverage_start_week = max(first_week, first_record_week)
         available_history_weeks = max(
             0,
-            min(HISTORY_WEEKS, ((current_week - coverage_start_week).days // 7) + 1),
+            min(
+                HISTORY_WEEKS,
+                ((last_completed_week - coverage_start_week).days // 7) + 1,
+            ),
         )
 
     predictions = []
@@ -102,8 +107,8 @@ def weekly_demand_forecast():
         history_status = "ready"
 
     return {
-        "week_start": next_week.isoformat(),
-        "week_end": (next_week + timedelta(days=6)).isoformat(),
+        "week_start": current_week.isoformat(),
+        "week_end": (current_week + timedelta(days=6)).isoformat(),
         "history_weeks_used": available_history_weeks,
         "minimum_history_weeks": MIN_HISTORY_WEEKS,
         "history_status": history_status,
