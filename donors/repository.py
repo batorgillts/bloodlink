@@ -3,11 +3,13 @@
 from contextlib import contextmanager
 
 from django.db import transaction
+from django.db.models import Q
+from django.utils import timezone
 
 from accounts.models import User
 from config.search import filter_text
 
-from .models import Donation, DonationIntervalRule, Donor
+from .models import Donation, DonationAppointment, DonationIntervalRule, Donor
 
 
 def find_contact(user_id):
@@ -103,6 +105,7 @@ def deactivate_donor(donor):
     donor.save(update_fields=["status"])
     donor.user.is_active = False
     donor.user.save(update_fields=["is_active"])
+    cancel_uncompleted_appointments(donor.pk)
 
 
 def mark_withdrawn(donor):
@@ -111,6 +114,7 @@ def mark_withdrawn(donor):
     donor.save(update_fields=["status"])
     donor.user.is_active = False
     donor.user.save(update_fields=["is_active"])
+    cancel_uncompleted_appointments(donor.pk)
 
 
 @contextmanager
@@ -135,3 +139,69 @@ def donation_dates(donor_id, donation_type, exclude_id=None):
 
 def create_donation(**fields):
     return Donation.objects.create(**fields)
+
+
+def appointments_for(donor_id):
+    return DonationAppointment.objects.filter(donor_id=donor_id).select_related(
+        "donation_type", "unit"
+    )
+
+
+def find_appointment(donor_id, appointment_id, *, lock=False):
+    records = appointments_for(donor_id)
+    if lock:
+        records = records.select_for_update(of=("self",))
+    return records.filter(pk=appointment_id).first()
+
+
+def appointment_rule(code):
+    return DonationIntervalRule.objects.filter(donation_type=code).first()
+
+
+def future_appointments(donor_id, now, *, exclude_id=None):
+    return appointments_for(donor_id).filter(
+        Q(status=DonationAppointment.Status.SCHEDULED, scheduled_at__gte=now)
+        | Q(status=DonationAppointment.Status.IN_PROGRESS)
+    ).exclude(pk=exclude_id)
+
+
+def create_appointment(**fields):
+    return DonationAppointment.objects.create(**fields)
+
+
+def save_appointment(appointment, fields):
+    for name, value in fields.items():
+        setattr(appointment, name, value)
+    appointment.save(update_fields=[*fields, "updated_at"])
+    return appointment
+
+
+def cancel_uncompleted_appointments(donor_id):
+    """Account withdrawal/deactivation cancels every unfinished booking."""
+    now = timezone.now()
+    appointments_for(donor_id).filter(status__in=[
+        DonationAppointment.Status.SCHEDULED, DonationAppointment.Status.IN_PROGRESS,
+    ]).update(
+        status=DonationAppointment.Status.CANCELLED, cancelled_at=now, updated_at=now,
+        cancellation_reason=DonationAppointment.CancellationReason.ACCOUNT_INACTIVE,
+    )
+
+
+def search_appointments(*, search=None, donation_type=None, blood_type=None, status=None):
+    records = DonationAppointment.objects.select_related(
+        "donation_type", "donor__user", "unit"
+    )
+    records = filter_text(records, search, ["donor__full_name", "donor__user__email"])
+    if donation_type:
+        records = records.filter(donation_type=donation_type)
+    if blood_type:
+        records = records.filter(donor__blood_type=blood_type)
+    if status:
+        records = records.filter(status=status)
+    return records
+
+
+def appointment_donor_id(appointment_id):
+    return DonationAppointment.objects.filter(pk=appointment_id).values_list(
+        "donor_id", flat=True
+    ).first()

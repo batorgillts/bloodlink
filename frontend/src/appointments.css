@@ -1,0 +1,53 @@
+.appointment-page-actions,
+.appointment-form-actions,
+.appointment-row-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.appointment-form-actions { justify-content: flex-end; }
+.appointment-date-time {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+.appointment-date-time .field-hint,
+.appointment-date-time .field-error { margin: 0.4rem 0 0; }
+.appointment-eligibility {
+  display: grid;
+  gap: 0.3rem;
+  padding: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-page);
+}
+.appointment-eligibility > span,
+.appointment-eligibility > small,
+.appointment-form-note { color: var(--color-muted); font-size: var(--text-sm); }
+.appointment-form-note { margin: 0; }
+.appointment-list { list-style: none; margin: 0; padding: 0; }
+.appointment-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: center;
+  padding: 1.3rem 1.5rem;
+  border-top: 1px solid var(--color-border);
+}
+.appointment-summary { min-width: 0; overflow-wrap: anywhere; }
+.appointment-summary h3 { margin: 0; font-size: 1rem; }
+.appointment-summary p { margin: 0.4rem 0; }
+.appointment-summary > span { font-size: var(--text-sm); }
+.appointment-summary .appointment-state-note { font-size: var(--text-sm); }
+.appointment-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 1rem; }
+.appointment-controls .badge.scheduled { color: var(--color-primary); }
+.appointment-controls .badge.in_progress { color: var(--color-info); }
+.appointment-controls .badge.completed { color: var(--color-ok); }
+@media (max-width: 700px) {
+  .appointment-date-time { grid-template-columns: minmax(0, 1fr); }
+  .appointment-card { grid-template-columns: minmax(0, 1fr); padding: 1.2rem; }
+  .appointment-controls { justify-content: space-between; }
+  .appointment-form-actions > button { flex: 1 1 100%; }
+}

@@ -20,6 +20,8 @@ function open(path, role = "donor") {
 }
 beforeEach(() => {
   localStorage.clear();
+  HTMLDialogElement.prototype.showModal = function () { this.open = true; };
+  HTMLDialogElement.prototype.close = function () { this.open = false; };
   vi.stubGlobal("fetch", vi.fn(url => response(url.endsWith("/profile/") ? profile : history)));
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
@@ -52,6 +54,43 @@ test("new donor overview offers guidance and an honest empty history", async () 
   open("/me");
   expect(await screen.findByText("No donations recorded yet")).toBeInTheDocument();
   expect(screen.getByRole("link", {name: "Review contact information"})).toHaveAttribute("href", "/me/contact");
+});
+
+test("overview opens the appointment form from the identity row", async () => {
+  open("/me");
+  const booking = await screen.findByRole("button", {name: "Book a donation"});
+  expect(booking.closest(".donor-identity")).toHaveTextContent("Alex Demo");
+  fireEvent.click(booking);
+  const form = await screen.findByRole("dialog", {name: "Book a donation"});
+  expect(await within(form).findByLabelText("Donation type")).toBeInTheDocument();
+  fireEvent.click(within(form).getByRole("button", {name: "Close dialog"}));
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(fetch.mock.calls.some(([, options]) => options.method === "POST")).toBe(false);
+});
+
+test("donor navigation opens the separate appointment page", async () => {
+  vi.stubGlobal("fetch", vi.fn(url => response(url.endsWith("/appointments/") ? [] : url.endsWith("/profile/") ? profile : history)));
+  open("/me");
+  await screen.findByText("Alex Demo");
+  const nav = within(screen.getByRole("navigation"));
+  fireEvent.click(nav.getByRole("link", {name: "Donation appointments"}));
+  expect(await screen.findByRole("heading", {name: "Donation appointments", level: 1})).toBeInTheDocument();
+  expect(nav.getByRole("link", {name: "Donation appointments"})).toHaveAttribute("aria-current", "page");
+  expect(nav.getByRole("link", {name: "Overview"})).not.toHaveAttribute("aria-current");
+  await waitFor(() => expect(fetch.mock.calls.some(([url]) => url.endsWith("/appointments/"))).toBe(true));
+});
+
+test("coordinator cannot load donor appointments", () => {
+  open("/me/appointments", "coordinator");
+  expect(screen.getByRole("heading", {name: "You do not have access"})).toBeInTheDocument();
+  expect(fetch).not.toHaveBeenCalled();
+});
+
+test("anonymous appointment access redirects to sign-in", () => {
+  window.history.replaceState({}, "", "/me/appointments");
+  render(<App />);
+  expect(screen.getByRole("heading", {name: "Sign in to BloodLink"})).toBeInTheDocument();
+  expect(fetch).not.toHaveBeenCalled();
 });
 
 test("invalid contact fields stay editable, do not save, and can be cancelled", async () => {

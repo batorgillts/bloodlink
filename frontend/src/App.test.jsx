@@ -92,9 +92,9 @@ test("invalid credentials remain on sign-in with the backend message", async () 
     "No active account found",
   );
 });
-test("a donor cannot load a coordinator route", () => {
+test.each(["/inventory", "/appointments"])("a donor cannot load coordinator route %s", (path) => {
   login("donor");
-  window.history.replaceState({}, "", "/inventory");
+  window.history.replaceState({}, "", path);
   const fetch = vi.fn();
   vi.stubGlobal("fetch", fetch);
   render(<App />);
@@ -102,6 +102,16 @@ test("a donor cannot load a coordinator route", () => {
     screen.getByRole("heading", { name: "You do not have access" }),
   ).toBeInTheDocument();
   expect(fetch).not.toHaveBeenCalled();
+});
+test("coordinator appointments are linked in navigation and load their own API", async () => {
+  login();
+  window.history.replaceState({}, "", "/appointments");
+  const fetch = vi.fn(() => response({ appointments: [], donation_types: [] }));
+  vi.stubGlobal("fetch", fetch);
+  render(<App />);
+  expect(screen.getByRole("link", { name: "Donation appointments" })).toHaveAttribute("href", "/appointments");
+  expect(await screen.findByText("No donation appointments yet.")).toBeInTheDocument();
+  expect(fetch.mock.calls[0][0]).toMatch(/\/api\/appointments\/$/);
 });
 test("protected 401 clears the session and prompts sign-in", async () => {
   login();

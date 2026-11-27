@@ -21,6 +21,12 @@ from django.urls import include, path
 from rest_framework_simplejwt.views import TokenRefreshView
 
 from accounts.views import DonorRegistrationView, SignInView
+from donors.appointment_views import (
+    CoordinatorAppointmentCancelView,
+    CoordinatorAppointmentListView,
+    CoordinatorAppointmentRecordView,
+    CoordinatorAppointmentStartView,
+)
 from inventory import views as inventory_views
 
 
@@ -34,6 +40,19 @@ urlpatterns = [
     path("api/health/", health),
     path("api-auth/", include("rest_framework.urls")),  # login for the browsable API
     path("api/donors/", include("donors.urls")),
+    path("api/appointments/", CoordinatorAppointmentListView.as_view(), name="appointments"),
+    path(
+        "api/appointments/<int:appointment_id>/start/",
+        CoordinatorAppointmentStartView.as_view(), name="appointment-start",
+    ),
+    path(
+        "api/appointments/<int:appointment_id>/record/",
+        CoordinatorAppointmentRecordView.as_view(), name="appointment-record",
+    ),
+    path(
+        "api/appointments/<int:appointment_id>/cancel/",
+        CoordinatorAppointmentCancelView.as_view(), name="appointment-cancel",
+    ),
     # Authentication & Access
     path("api/auth/register/", DonorRegistrationView.as_view(), name="register"),
     path("api/auth/token/", SignInView.as_view(), name="token"),

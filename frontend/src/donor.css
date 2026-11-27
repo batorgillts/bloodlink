@@ -1,6 +1,7 @@
 .donor-identity { display: flex; align-items: center; flex-wrap: wrap; gap: 0.8rem; margin: -0.3rem 0 1.5rem; }
 .donor-identity .blood-type { border-left: 1px solid var(--color-border); padding-left: 0.8rem; }
 .donor-identity .muted { font-size: var(--text-sm); }
+.donor-identity .donor-booking-button { margin-left: auto; }
 .donor-stats { grid-template-columns: repeat(3, 1fr); }
 .donor-stats .donor-summary-date { font-size: 1.35rem; padding-top: 0.4rem; }
 .donor-page .panel-title a { font-size: var(--text-sm); }
@@ -44,6 +45,7 @@
   .donor-record-cards, .donor-eligibility-cards { display: block; }
 }
 @media (max-width: 700px) {
+  .donor-identity .donor-booking-button { width: 100%; margin-left: 0; }
   .donor-stats { grid-template-columns: 1fr 1fr; }
   .donor-stats > div:last-child { grid-column: 1 / -1; }
   .donor-stats > div { padding: 1rem; }

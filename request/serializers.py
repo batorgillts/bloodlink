@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from config.choices import Component
+from config.choices import BloodType, Component
 from inventory.models import BloodUnit
 
 from .models import BloodRequest, RequestEvent, Reservation
@@ -112,10 +112,13 @@ class RequestEventSerializer(serializers.ModelSerializer):
 
 
 class RequestHistoryQuerySerializer(serializers.Serializer):
-    """US-20: optional inclusive range on the date a request was logged."""
+    """US-20: optional request details and inclusive logged-date range."""
 
     logged_from = serializers.DateField(required=False)
     logged_to = serializers.DateField(required=False)
+    blood_type = serializers.ChoiceField(choices=BloodType.choices, required=False)
+    component = serializers.ChoiceField(choices=Component.choices, required=False)
+    quantity = serializers.IntegerField(min_value=1, required=False)
 
     def validate(self, attrs):
         start = attrs.get("logged_from")

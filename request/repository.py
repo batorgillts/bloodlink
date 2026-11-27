@@ -87,8 +87,10 @@ def request_events(request_id):
     return RequestEvent.objects.filter(request_id=request_id).select_related("actor", "unit")
 
 
-def requests_for_history(*, logged_from=None, logged_to=None):
-    """US-20: requests logged in an inclusive date range, with their events."""
+def requests_for_history(
+    *, logged_from=None, logged_to=None, blood_type=None, component=None, quantity=None
+):
+    """US-20: requests matching all supplied filters, with their events."""
     requests = BloodRequest.objects.select_related("logged_by").prefetch_related(
         Prefetch(
             "events",
@@ -99,6 +101,12 @@ def requests_for_history(*, logged_from=None, logged_to=None):
         requests = requests.filter(logged_at__date__gte=logged_from)
     if logged_to is not None:
         requests = requests.filter(logged_at__date__lte=logged_to)
+    if blood_type is not None:
+        requests = requests.filter(blood_type=blood_type)
+    if component is not None:
+        requests = requests.filter(component=component)
+    if quantity is not None:
+        requests = requests.filter(quantity=quantity)
     return requests
 
 

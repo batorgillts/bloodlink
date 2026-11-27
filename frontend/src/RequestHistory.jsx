@@ -1,10 +1,9 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { birthDateToISO } from "./registration";
-import { Field, Form, Header, Notice, ResourceState, Table } from "./ui";
+import { BloodFields, Field, Form, Header, Notice, ResourceState, Table } from "./ui";
 import { COMPONENTS, title, time, useResource } from "./viewHelpers";
 
-const PERIOD_MESSAGE = "No requests found for this period";
 const STATUS_MARK = {
   pending: "◌",
   partially_fulfilled: "◑",
@@ -42,30 +41,37 @@ export function RequestHistory() {
   const [rangeError, setRangeError] = useState("");
   const resource = useResource(`/api/requests/history/${search}`);
   const requests = resource.data?.requests ?? [];
-  const periodEmpty = resource.data?.message === PERIOD_MESSAGE;
 
   function apply(event) {
     event.preventDefault();
     const values = Object.fromEntries(new FormData(event.currentTarget));
+    const params = new URLSearchParams();
+    for (const name of ["blood_type", "component"]) {
+      if (values[name]) params.set(name, values[name]);
+    }
+    if (String(values.quantity || "").trim()) {
+      params.set("quantity", String(Number(values.quantity)));
+    }
     const fromText = String(values.logged_from || "").trim();
     const toText = String(values.logged_to || "").trim();
-    if (!fromText && !toText) {
-      setRangeError("");
-      setSearch("");
-      return;
-    }
-    const loggedFrom = birthDateToISO(fromText);
-    const loggedTo = birthDateToISO(toText);
-    if (!loggedFrom || !loggedTo) {
-      setRangeError("Enter both a start date and an end date in MM/DD/YYYY format.");
-      return;
-    }
-    if (loggedFrom > loggedTo) {
-      setRangeError("The start date must be on or before the end date.");
-      return;
+    if (fromText || toText) {
+      const loggedFrom = birthDateToISO(fromText);
+      const loggedTo = birthDateToISO(toText);
+      if (!loggedFrom || !loggedTo) {
+        setRangeError("Enter both a start date and an end date in MM/DD/YYYY format.");
+        return;
+      }
+      if (loggedFrom > loggedTo) {
+        setRangeError("The start date must be on or before the end date.");
+        return;
+      }
+      params.set("logged_from", loggedFrom);
+      params.set("logged_to", loggedTo);
     }
     setRangeError("");
-    setSearch(`?${new URLSearchParams({ logged_from: loggedFrom, logged_to: loggedTo })}`);
+    const nextSearch = params.size ? `?${params}` : "";
+    if (nextSearch === search) resource.reload();
+    else setSearch(nextSearch);
   }
 
   return (
@@ -76,16 +82,21 @@ export function RequestHistory() {
       <p className="request-history-note">
         History entries are kept for traceability and cannot be edited or deleted.
       </p>
-      <Form className="filters" onSubmit={apply}>
-        <Field label="Logged from" name="logged_from" type="date" />
-        <Field label="Logged to" name="logged_to" type="date" />
-        <button type="submit" className="secondary">Apply date range</button>
+      <Form className="filters request-history-filters" onSubmit={apply}>
+        <div className="request-history-type-filters">
+          <BloodFields filters />
+          <Field label="Quantity" name="quantity" type="number" min={1} step="1" placeholder="Any quantity" />
+        </div>
+        <div className="request-history-filter-row">
+          <Field label="Logged from" name="logged_from" type="date" />
+          <Field label="Logged to" name="logged_to" type="date" />
+          <button type="submit" className="secondary">Apply filters</button>
+        </div>
       </Form>
       <Notice error>{rangeError}</Notice>
       <ResourceState resource={resource} />
-      {periodEmpty && <p className="empty" role="status">{PERIOD_MESSAGE}</p>}
-      {resource.data && !periodEmpty && requests.length === 0 && (
-        <p className="empty" role="status">No requests have been logged.</p>
+      {resource.data && requests.length === 0 && (
+        <p className="empty" role="status">{resource.data.message || "No requests have been logged."}</p>
       )}
       {requests.map((request) => (
         <section className="panel audit-request" key={request.id}>

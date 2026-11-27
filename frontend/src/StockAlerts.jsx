@@ -1,7 +1,7 @@
 // US-12: low-stock alerts, the expiring-soon report and coordinator-set thresholds.
 import { useState } from "react";
 import { api } from "./api/client";
-import { BloodFields, Field, Form, Modal, Notice, ResourceState, Table } from "./ui";
+import { BloodFields, Field, Form, Header, Modal, Notice, ResourceState, Table } from "./ui";
 import { COMPONENTS, time, useResource } from "./viewHelpers";
 
 const label = (row) => `${row.blood_type} ${COMPONENTS[row.component] ?? row.component}`;
@@ -14,86 +14,86 @@ export function StockAlerts() {
   const stockRows = data?.stock?.filter((row) => row.available > 0 || row.minimum_units) ?? [];
 
   return (
-    <section className="panel" aria-labelledby="stock-alerts-title">
-      <div className="panel-title">
-        <div>
-          <h2 id="stock-alerts-title">Inventory dashboard</h2>
-          <p className="muted">Low-stock alerts and units close to expiry. Reserved, discarded and expired units are not counted.</p>
-        </div>
+    <>
+      <Header title="Inventory alerts" action={
         <div className="actions">
           <button className="secondary" onClick={() => setSettings(true)}>Alert settings</button>
-          <button className="text-button" onClick={resource.reload}>Refresh dashboard</button>
+          <button className="text-button" onClick={resource.reload}>Refresh alerts</button>
         </div>
-      </div>
-      <ResourceState resource={resource} />
-      {data && (
-        <div className="stock-alerts">
-          <div>
-            <h3>Low-stock alerts</h3>
-            {data.low_stock.length ? (
-              <ul className="alert-list">
-                {data.low_stock.map((row) => (
-                  <li key={`${row.blood_type}-${row.component}`} className="notice error">
-                    <strong>Low stock: {label(row)}</strong> · {row.available} available, alert below {row.minimum_units}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="muted">No low-stock alerts. Set thresholds under Alert settings.</p>
-            )}
+      }>
+        Monitor low stock and upcoming expiries. Reserved, discarded and expired units are not counted.
+      </Header>
+      <section className="panel" aria-label="Inventory stock and expiry alerts">
+        <ResourceState resource={resource} />
+        {data && (
+          <div className="stock-alerts">
+            <div>
+              <h2>Low-stock alerts</h2>
+              {data.low_stock.length ? (
+                <ul className="alert-list">
+                  {data.low_stock.map((row) => (
+                    <li key={`${row.blood_type}-${row.component}`} className="notice error">
+                      <strong>Low stock: {label(row)}</strong> · {row.available} available, alert below {row.minimum_units}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="muted">No low-stock alerts. Set thresholds under Alert settings.</p>
+              )}
+            </div>
+            <div>
+              <h2>Expiring soon</h2>
+              {data.expiring_soon.map((group) => (
+                <div key={group.component} className="expiry-group">
+                  <h3>{group.label} <span className="muted">(within {group.window_days} days by default)</span></h3>
+                  {group.overrides?.length > 0 && (
+                    <p className="muted window-overrides">
+                      Own window: {group.overrides.map((o) => `${o.blood_type} ${o.window_days} days`).join(", ")}
+                    </p>
+                  )}
+                  <Table
+                    rows={group.units}
+                    empty={`No ${group.label.toLowerCase()} expiring soon.`}
+                    columns={[
+                      ["Unit", (u) => <strong>{u.unit_code}</strong>],
+                      ["Blood type", (u) => <span className="blood-type">{u.blood_type}</span>],
+                      ["Expires", (u) => time(u.expires_at)],
+                      ["Window", (u) => (u.window_days === group.window_days
+                        ? `${u.window_days} days`
+                        : `${u.window_days} days (${u.blood_type} setting)`)],
+                    ]}
+                  />
+                </div>
+              ))}
+            </div>
+            <div>
+              <h2>Stock by blood type</h2>
+              <Table
+                rows={stockRows}
+                rowKey={(row) => `${row.blood_type}-${row.component}`}
+                empty="No usable units and no thresholds yet."
+                columns={[
+                  ["Blood type", (r) => <span className="blood-type">{r.blood_type}</span>],
+                  ["Component", (r) => COMPONENTS[r.component]],
+                  ["Available", (r) => r.available],
+                  ["Alert below", (r) => r.minimum_units ?? "Not set"],
+                  ["Status", (r) => (r.is_low ? <span className="badge expired">Low stock</span> : <span className="badge available">OK</span>)],
+                  ["Closest to expiry", (r) => r.closest_to_expiry
+                    ? `${r.closest_to_expiry.unit_code} · ${time(r.closest_to_expiry.expires_at)}`
+                    : "—"],
+                ]}
+              />
+            </div>
           </div>
-          <div>
-            <h3>Expiring soon</h3>
-            {data.expiring_soon.map((group) => (
-              <div key={group.component} className="expiry-group">
-                <h4>{group.label} <span className="muted">(within {group.window_days} days by default)</span></h4>
-                {group.overrides?.length > 0 && (
-                  <p className="muted window-overrides">
-                    Own window: {group.overrides.map((o) => `${o.blood_type} ${o.window_days} days`).join(", ")}
-                  </p>
-                )}
-                <Table
-                  rows={group.units}
-                  empty={`No ${group.label.toLowerCase()} expiring soon.`}
-                  columns={[
-                    ["Unit", (u) => <strong>{u.unit_code}</strong>],
-                    ["Blood type", (u) => <span className="blood-type">{u.blood_type}</span>],
-                    ["Expires", (u) => time(u.expires_at)],
-                    ["Window", (u) => (u.window_days === group.window_days
-                      ? `${u.window_days} days`
-                      : `${u.window_days} days (${u.blood_type} setting)`)],
-                  ]}
-                />
-              </div>
-            ))}
-          </div>
-          <div>
-            <h3>Stock by blood type</h3>
-            <Table
-              rows={stockRows}
-              rowKey={(row) => `${row.blood_type}-${row.component}`}
-              empty="No usable units and no thresholds yet."
-              columns={[
-                ["Blood type", (r) => <span className="blood-type">{r.blood_type}</span>],
-                ["Component", (r) => COMPONENTS[r.component]],
-                ["Available", (r) => r.available],
-                ["Alert below", (r) => r.minimum_units ?? "Not set"],
-                ["Status", (r) => (r.is_low ? <span className="badge expired">Low stock</span> : <span className="badge available">OK</span>)],
-                ["Closest to expiry", (r) => r.closest_to_expiry
-                  ? `${r.closest_to_expiry.unit_code} · ${time(r.closest_to_expiry.expires_at)}`
-                  : "—"],
-              ]}
-            />
-          </div>
-        </div>
-      )}
+        )}
+      </section>
       {settings && (
         <ThresholdSettings
           onClose={() => setSettings(false)}
           onSaved={resource.reload}
         />
       )}
-    </section>
+    </>
   );
 }
 

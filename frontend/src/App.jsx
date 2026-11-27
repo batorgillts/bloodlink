@@ -20,6 +20,8 @@ import { DonorRegistry, DonorRecord } from "./DonorManagement";
 import { DiscardUnit, RequestExtras } from "./InventoryActions";
 import { StockAlerts } from "./StockAlerts";
 import { DonorOverview, DonorHistory, DonorContact } from "./DonorPortal";
+import { DonorAppointments } from "./DonorAppointments";
+import { CoordinatorAppointments } from "./CoordinatorAppointments";
 import { RequestHistory } from "./RequestHistory";
 const home = (user) => (user?.role === "coordinator" ? "/requests" : "/me");
 
@@ -194,6 +196,21 @@ function Auth({ register, onSignIn, expired, withdrawn }) {
     </main>
   );
 }
+function NavigationIcon({ name }) {
+  const icons = {
+    requests: <><rect x="5" y="3" width="14" height="18" rx="2" /><path d="M9 8h6M9 12h6M9 16h4" /></>,
+    history: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
+    donors: <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z" />,
+    appointments: <><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M7 3v4M17 3v4M3 10h18M7 14h3M14 14h3M7 17h3" /></>,
+    inventory: <><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18M3 15h18M9 3v18M15 3v18" /></>,
+    alerts: <><path d="M10.3 4.2 2.6 18a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 4.2a2 2 0 0 0-3.4 0ZM12 9v5" /><circle cx="12" cy="17.5" r=".8" fill="currentColor" stroke="none" /></>,
+  };
+  return <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+    {icons[name]}
+  </svg>;
+}
+
 function Shell({ user, onSignOut, children }) {
   return (
     <div className="app-layout">
@@ -208,19 +225,24 @@ function Shell({ user, onSignOut, children }) {
           {user.role === "coordinator" ? (
             <>
               <NavLink to="/requests">
-                ▤ <span>Blood requests</span>
+                <NavigationIcon name="requests" /><span>Blood requests</span>
               </NavLink>
               <NavLink to="/request-history">
-                ◷ <span>Request history</span>
+                <NavigationIcon name="history" /><span>Request history</span>
               </NavLink>
-              <NavLink to="/donors">♡ <span>Donor registry</span></NavLink>
+              <NavLink to="/donors"><NavigationIcon name="donors" /><span>Donor registry</span></NavLink>
+              <NavLink to="/appointments"><NavigationIcon name="appointments" /><span>Donation appointments</span></NavLink>
               <NavLink to="/inventory">
-                ▦ <span>Blood inventory</span>
+                <NavigationIcon name="inventory" /><span>Blood inventory</span>
+              </NavLink>
+              <NavLink to="/inventory-alerts">
+                <NavigationIcon name="alerts" /><span>Inventory alerts</span>
               </NavLink>
             </>
           ) : (
             <>
               <NavLink to="/me" end><span>Overview</span></NavLink>
+              <NavLink to="/me/appointments"><span>Donation appointments</span></NavLink>
               <NavLink to="/me/history"><span>Donation history</span></NavLink>
               <NavLink to="/me/contact"><span>Contact information</span></NavLink>
             </>
@@ -282,9 +304,7 @@ function Inventory() {
   const [query, setQuery] = useState("");
   const [creating, setCreating] = useState(false);
   const [message, setMessage] = useState("");
-  const [dashboardVersion, setDashboardVersion] = useState(0);
   const resource = useResource(`/api/units/${query}`);
-  const changed = () => { resource.reload(); setDashboardVersion((v) => v + 1); };
   return (
     <>
       <Header
@@ -296,7 +316,6 @@ function Inventory() {
         Track available units, components and expiry dates.
       </Header>
       <Notice>{message}</Notice>
-      <StockAlerts key={dashboardVersion} />
       <Form
         className="filters inventory-filters"
         onSubmit={(e) => {
@@ -344,9 +363,9 @@ function Inventory() {
               ["Source donation", (u) => u.source_donation
                 ? <Link to={`/donors/${u.source_donation.donor_id}`}>{u.source_donation.donor_name} · Donation #{u.source_donation.id}</Link>
                 : <span className="muted">Source not recorded</span>],
-              ["Action", (u) => <div className="actions">
-                {u.can_edit && <button className="secondary" onClick={() => setEditing(u)} aria-label={`Edit ${u.unit_code}`}>Edit</button>}
-                {u.can_discard ? <button className="danger secondary" onClick={() => setDiscarding(u)}>Discard {u.unit_code}</button> : <span>Discarded: {title(u.discard_reason)}</span>}
+              ["Action", (u) => <div className="inventory-unit-actions">
+                {u.can_edit && <button className="secondary inventory-edit" onClick={() => setEditing(u)} aria-label={`Edit ${u.unit_code}`}>Edit</button>}
+                {u.can_discard ? <button className="danger secondary inventory-discard" onClick={() => setDiscarding(u)} aria-label={`Discard ${u.unit_code}`}>Discard</button> : <span className="inventory-discarded">Discarded: {title(u.discard_reason)}</span>}
               </div>],
               [
                 "Blood type",
@@ -364,9 +383,9 @@ function Inventory() {
           />
         )}
       </section>
-      {discarding && <DiscardUnit unit={discarding} onClose={()=>setDiscarding(null)} onDiscarded={()=>{setDiscarding(null);setMessage("Unit discarded. Any affected request has been updated.");changed();}} />}
+      {discarding && <DiscardUnit unit={discarding} onClose={()=>setDiscarding(null)} onDiscarded={()=>{setDiscarding(null);setMessage("Unit discarded. Any affected request has been updated.");resource.reload();}} />}
       {editing && <EditBloodUnit unit={editing} onClose={() => setEditing(null)} onSaved={() => {
-        setEditing(null); setMessage("Corrections saved. Source donation, expiry and eligibility have been recalculated."); changed();
+        setEditing(null); setMessage("Corrections saved. Source donation, expiry and eligibility have been recalculated."); resource.reload();
       }} />}
       {creating && (
         <RecordBloodUnit
@@ -376,7 +395,7 @@ function Inventory() {
             setMessage(
               `Unit ${unit.unit_code} linked to donation #${unit.donation_id}. Expiry: ${time(unit.expires_at)}. It appears when it matches the current filters.`,
             );
-            changed();
+            resource.reload();
           }}
         />
       )}
@@ -753,7 +772,9 @@ function Application() {
         path="/inventory"
         element={protect("coordinator", <Inventory />)}
       />
+      <Route path="/inventory-alerts" element={protect("coordinator", <StockAlerts />)} />
       <Route path="/donors" element={protect("coordinator", <DonorRegistry />)} />
+      <Route path="/appointments" element={protect("coordinator", <CoordinatorAppointments />)} />
       <Route path="/donors/:id" element={protect("coordinator", <DonorRecord />)} />
       <Route path="/requests" element={protect("coordinator", <Requests />)} />
       <Route path="/request-history" element={protect("coordinator", <RequestHistory />)} />
@@ -762,6 +783,7 @@ function Application() {
         element={protect("coordinator", <DetailRoute />)}
       />
       <Route path="/me" element={protect("donor", <DonorOverview />)} />
+      <Route path="/me/appointments" element={protect("donor", <DonorAppointments />)} />
       <Route path="/me/history" element={protect("donor", <DonorHistory />)} />
       <Route path="/me/contact" element={protect("donor", <DonorContact
         onWithdrawn={() => { clearSession(); setUser(null); setExpired(false); setWithdrawn(true); }}
