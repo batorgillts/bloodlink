@@ -60,4 +60,5 @@ urlpatterns = [
     ),
     # Blood Request Management
     path("api/requests/", include("request.urls")),
+    path("api/forecast/", include("forecasting.urls")),
 ]

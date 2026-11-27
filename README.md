@@ -166,6 +166,7 @@ and cannot be used to edit it. Donation history includes a `recorded_by` name, o
 | GET | `/api/requests/<request_id>/history/` | View a request's event history, including cancellation time and coordinator (US-19). Each match, reservation and status change is included (US-20). PUT, PATCH and DELETE are rejected | Coordinator |
 | GET | `/api/requests/history/?logged_from=&logged_to=` | Audit log of every request: blood type, component, quantity, logged time, coordinator, and events. Both dates are inclusive (`YYYY-MM-DD`) and must be sent together. An empty range returns `No requests found for this period` (US-20) | Coordinator |
 | POST | `/api/requests/<id>/reserve/` (`unit_ids`) | Reserve selected compatible units in one transaction; request becomes `partially_fulfilled` or `fulfilled` (US-16). 400 if too many or incompatible units, 409 if a unit is no longer available or the request is closed, 404 if not found | Coordinator |
+| GET | `/api/forecast/weekly/` | Return next week's request-unit forecast and weekly history per blood type/component. Uses up to 12 weeks, minimum 4; canceled requests are excluded. A shorter supported window reports `history_weeks_used`; under 4 weeks predictions are null with `history_status: insufficient_history` | Coordinator |
 
 Protected endpoints require `Authorization: Bearer <access token>`.
 Without it they return 401. A signed-in donor calling a coordinator-only endpoint gets 403.

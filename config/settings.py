@@ -31,6 +31,7 @@ INSTALLED_APPS = [
     "donors",  # Donor & Donation Management
     "inventory",  # Inventory Management
     "request",  # Blood request management
+    "forecasting",  # Blood request demand forecasting
 ]
 
 MIDDLEWARE = [
